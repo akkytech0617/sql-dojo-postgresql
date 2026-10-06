@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:18
+    container_name: ${COMPOSE_PROJECT_NAME:-sql-dojo}-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dojo_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dojo_admin_pw}
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:${PGPORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+volumes:
+  pgdata:
