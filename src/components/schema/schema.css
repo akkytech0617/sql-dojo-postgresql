@@ -1,0 +1,41 @@
+.schema-panel { display: grid; gap: 12px; }
+.schema-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.schema-toolbar select { border: 1px solid #414b59; background: #12161c; color: #e5e8ed; border-radius: 6px; padding: 8px 12px; min-height: 44px; }
+.schema-toolbar label { font-size: 12px; color: #a9b1bf; display: flex; align-items: center; gap: 8px; }
+.schema-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.schema-tabs button { min-height: 34px; padding: 6px 12px; font-size: 12px; border-radius: 16px; background: transparent; color: #a9b1bf; border: 1px solid #303743; }
+.schema-tabs button[aria-pressed=true] { color: #16342a; background: #a3ddc1; border-color: #a3ddc1; font-weight: 650; }
+.schema-view { display: flex; gap: 8px; margin-left: auto; }
+.schema-view button { min-height: 34px; padding: 6px 14px; font-size: 12px; }
+.schema-view button[aria-pressed=true] { color: #a3ddc1; border-color: #5b8974; background: #26382e; }
+.schema-status { font-size: 12px; color: #a9b1bf; }
+.schema-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.schema-badge { font-size: 10px; font-family: "SFMono-Regular", Consolas, monospace; border: 1px solid; border-radius: 4px; padding: 1px 5px; letter-spacing: .05em; }
+.schema-badge.pk { color: #ffd479; border-color: #6d5c2e; background: #2f2a1d; }
+.schema-badge.fk { color: #9ccdf5; border-color: #37516d; background: #1d2733; }
+.schema-badge.nn { color: #909aab; border-color: #3b424e; background: #20242c; }
+.schema-badge.kind { color: #b9a7d1; border-color: #504360; background: #241f2e; }
+.schema-badge.action { color: #cbbf98; border-color: #60563e; background: #2a281f; }
+.schema-table { border: 1px solid #2c333e; border-radius: 6px; margin-bottom: 12px; background: #171b22; }
+.schema-table summary { cursor: pointer; padding: 10px 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.schema-table summary .table-name { font-family: "SFMono-Regular", Consolas, monospace; color: #c0ead4; font-size: 13px; }
+.schema-table summary .schema-meta { color: #a9b1bf; font-size: 12px; margin-left: auto; }
+.schema-table-body { padding: 0 12px 12px; }
+.schema-columns { margin: 8px 0 12px; }
+.schema-columns table { font-size: 12px; }
+.schema-columns td, .schema-columns th { padding: 8px 10px; }
+.schema-columns .col-name { color: #e5e8ed; white-space: nowrap; }
+.schema-columns .col-type { color: #9fb6c9; }
+.schema-columns .col-default { color: #cbbf98; }
+.schema-columns .col-comment { color: #a9b1bf; }
+.schema-section { margin-top: 12px; }
+.schema-section h3 { font-size: 12px; color: #a9b1bf; margin: 0 0 6px; font-weight: 600; }
+.schema-section ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.schema-section li { font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; color: #c0c8d3; overflow-wrap: anywhere; }
+.schema-section li .schema-badge { margin-right: 8px; }
+.schema-roles { display: flex; flex-wrap: wrap; gap: 8px; }
+.schema-roles .role-chip { font-size: 12px; font-family: "SFMono-Regular", Consolas, monospace; color: #c0c8d3; border: 1px solid #303743; background: #1b2028; border-radius: 4px; padding: 4px 10px; }
+.schema-roles .role-chip .role-attr { color: #a3ddc1; margin-left: 6px; }
+.er-diagram { overflow-x: auto; border: 1px solid #2c333e; border-radius: 6px; background: #171b22; padding: 8px; }
+.er-diagram svg { max-width: 100%; height: auto; }
+.schema-error { color: #ffb3b3; background: #2b2025; border: 1px solid #6b4249; border-radius: 6px; padding: 12px 16px; font-size: 12px; }
