@@ -6,6 +6,7 @@ import { ResultGrid } from '../components/ResultGrid'
 import { SessionBar } from '../components/SessionBar'
 import { SqlEditor } from '../components/SqlEditor'
 import type { ConnectionInfo, QueryResponse, SessionStatus, SqlError } from '../shared/types'
+import { PanelDock } from '../components/PanelDock'
 const initialSql = `-- まずは、小さなクエリから。
 -- 範囲を選択すると、その部分だけ実行できます。
 SELECT
@@ -70,6 +71,8 @@ export function PlaygroundPage() {
     <div className="section-label"><h2>実行結果</h2><span className="muted small">{running ? 'データベースで実行中…' : '結果・エラー・通知を確認'}</span></div>
     {(connectionError ?? response.error) && <ErrorPanel error={(connectionError ?? response.error)!} />}
     <NoticeList notices={response.notices} /><ResultGrid results={response.results} />
+    <PanelDock />
     <footer className="page-footer"><span>SQL道場 / ローカル学習環境</span><span>変更は実際のデータベースに反映されます。</span></footer>
   </main>
 }
+export const page = { id: 'playground', label: '自由練習', component: PlaygroundPage, order: 10 }

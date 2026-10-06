@@ -1,4 +1,5 @@
 import type { ConnectionInfo, HealthResponse, QueryResponse, SessionStatus, SqlError } from '../shared/types'
+import type { Chapter, CheckRequest, CheckResponse, ResetResponse, SessionId } from '../shared/lessons'
 export class ApiError extends Error {
   constructor(message: string, public readonly sqlError?: SqlError) { super(message); this.name = 'ApiError' }
 }
@@ -15,6 +16,10 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
 }
 const sessionPath = (id: string) => `/sessions/${encodeURIComponent(id)}`
 export const api = {
+  lessons: () => request<Chapter[]>('/lessons'),
+  check: (input: CheckRequest) => request<CheckResponse>('/lessons/check', input),
+  reset: (toChapter = 0) => request<ResetResponse>('/reset', { toChapter }),
+  csv: (file: string, session: SessionId) => request<QueryResponse>('/lessons/csv', { file, session }),
   health: () => request<HealthResponse>('/health'),
   sessions: () => request<SessionStatus[]>('/sessions'),
   connect: (id: string, info: ConnectionInfo) => request<SessionStatus>(`${sessionPath(id)}/connect`, info),

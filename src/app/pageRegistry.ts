@@ -1,6 +1,5 @@
 import type { ComponentType } from 'react'
-import { PlaygroundPage } from '../pages/PlaygroundPage'
-export interface PageDefinition { id: string; label: string; component: ComponentType }
-export const pageRegistry: PageDefinition[] = [
-  { id: 'playground', label: '自由練習', component: PlaygroundPage },
-]
+export interface PageDefinition { id: string; label: string; component: ComponentType; order?: number }
+const modules = import.meta.glob<{ page?: PageDefinition }>('../pages/*.tsx', { eager: true })
+export const pageRegistry: PageDefinition[] = Object.values(modules).flatMap(module => module.page ? [module.page] : [])
+  .sort((a, b) => (a.order ?? 100) - (b.order ?? 100) || a.id.localeCompare(b.id))

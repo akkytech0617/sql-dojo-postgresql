@@ -5,7 +5,11 @@ import { serializeSqlError } from './errors-ja.js'
 import { healthRoutes } from './routes/health.js'
 import { sessionRoutes } from './routes/sessions.js'
 import type { SessionManager } from './sessions.js'
-export function createApp(manager: SessionManager) {
+import { LessonEngine } from './lessons.js'
+import { lessonRoutes } from './routes/lessons.js'
+import type { Chapter } from '../src/shared/lessons.js'
+export function createApp(manager: SessionManager, chapters?: Chapter[]) {
+  const engine = new LessonEngine(manager, chapters)
   const app = new Hono()
   app.use('/api/*', bodyLimit({ maxSize: 1_100_000, onError: c => c.json({ message: 'リクエストが大きすぎます。' }, 413) }))
   app.use('/api/*', async (c, next) => {
@@ -17,8 +21,20 @@ export function createApp(manager: SessionManager) {
     }
     await next()
   })
+  app.use('/api/*', async (c, next) => {
+    if (engine.resetting) return c.json({ message: 'リセット中です。少し待ってください。' }, 409)
+    await next()
+  })
   app.route('/api/health', healthRoutes(manager))
   app.route('/api/sessions', sessionRoutes(manager))
+  app.route('/api/lessons', lessonRoutes(engine, manager))
+  app.post('/api/reset', async c => {
+    const body: unknown = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return c.json({ message: 'リセット指定が不正です。' }, 400)
+    const toChapter = (body as { toChapter?: unknown }).toChapter
+    if (toChapter !== undefined && typeof toChapter !== 'number') return c.json({ message: '章番号が不正です。' }, 400)
+    return c.json(await engine.reset(toChapter))
+  })
   app.onError((error, c) => c.json({ error: serializeSqlError(error) }, 400))
   app.notFound(c => c.json({ message: 'ページが見つかりません。' }, 404))
   return app

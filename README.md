@@ -38,9 +38,19 @@ PGPORT=5434 docker compose -p sql-dojo-w3 down
 
 プロジェクト名ごとにコンテナー名とボリュームが分離されます。`COMPOSE_PROJECT_NAME=sql-dojo-w3` の指定でも同様です。Vite のプロキシは API :3001 固定なので、並列 API の起動時は `vite.config.ts` も調整してください。
 
+## 学習コース
+
+教材は `lessons/chNN.ts`（`lessons/index.ts` が唯一のソース）にあり、`GET /api/lessons` で配信します。採点は `POST /api/lessons/check`、章の開始状態への再生は `POST /api/reset {toChapter}` です（`library` DB と `lib_` ロールを作り直します）。契約は `docs/schema-contract.md`、執筆手順は `docs/lesson-authoring.md` を参照してください。
+
+```sh
+LESSON_CHAPTERS=3-6 pnpm test:lessons   # 指定範囲の教材を実 DB で検証
+```
+
+ページは `src/pages/*.tsx` の `export const page`、補助パネルは `src/panels/*.tsx` の `export const panel` で自動登録されます。
+
 ## 拡張の入口
 
-- `src/app/pageRegistry.ts` に `{ id, label, component }` を追加するとページが増えます。
+- `src/pages/*.tsx` で `export const page = { id, label, component, order }` を定義するとページが増えます（`src/app/pageRegistry.ts` が自動検出）。
 - `src/shared/types.ts` がブラウザーとサーバー共通の API 型です。
 - `server/app.ts` の `createApp(manager)` は listen しないため、`app.request()` でテストできます。
 - `SessionManager` は `connect` / `disconnect` / `status` / `list` / `query` / `cancel` / `health` / `close` を提供します。新しい ID は `connect` で追加可能です。
