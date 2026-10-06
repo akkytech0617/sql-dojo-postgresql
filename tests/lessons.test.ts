@@ -6,6 +6,7 @@ import { splitStatements } from '../server/lesson-sql.js'
 import { SessionManager } from '../server/sessions.js'
 import { chapters } from '../lessons/index.js'
 import demoChapter from './fixtures/demoChapter.js'
+import { readBootstrap, withBootstrap } from './helpers/bootstrap.js'
 import type { Chapter, CheckRequest, CheckResponse, ResetResponse, Step } from '../src/shared/lessons.js'
 import type { QueryResponse } from '../src/shared/types.js'
 const managers: SessionManager[] = []
@@ -119,8 +120,8 @@ const first = Number(range[1]), last = Number(range[2] ?? range[1])
 if (first < 0 || last > 12 || first > last) throw new Error('LESSON_CHAPTERS range must be within 0-12')
 afterAll(async () => { await Promise.all(managers.map(manager => manager.close())) })
 describe('canonical lessons (real PostgreSQL, ordered)', () => {
-  const h = harness(chapters)
-  it(`prepares chapter ${first}`, async () => { await h.reset(first) })
+  const h = harness(withBootstrap(chapters, first, readBootstrap(process.env.LESSON_BOOTSTRAP)))
+  it(`prepares chapter ${first}${process.env.LESSON_BOOTSTRAP ? ` + ${process.env.LESSON_BOOTSTRAP}` : ''}`, async () => { await h.reset(first) })
   for (const chapter of chapters.filter(chapter => chapter.id >= first && chapter.id <= last)) {
     it(`ch${String(chapter.id).padStart(2, '0')} ${chapter.title}: solutions/checks and replay fingerprint`, async () => {
       for (const step of chapter.steps) await h.execute(step)
