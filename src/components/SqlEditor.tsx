@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
+import CodeMirror, { Prec } from '@uiw/react-codemirror'
 import { PostgreSQL, sql } from '@codemirror/lang-sql'
 import { EditorView, keymap } from '@codemirror/view'
 interface Props { value: string; onChange: (sql: string) => void; onRun: (sql: string) => void; busy: boolean }
@@ -18,13 +18,14 @@ export function SqlEditor({ value, onChange, onRun, busy }: Props) {
   const extensions = useMemo(() => [
     sql({ dialect: PostgreSQL }),
     EditorView.contentAttributes.of({ 'aria-label': 'SQL エディター' }),
-    keymap.of([{ key: 'Mod-Enter', run: editor => {
+    // Override basicSetup's Mod-Enter (insertBlankLine) with the SQL run shortcut.
+    Prec.highest(keymap.of([{ key: 'Mod-Enter', run: editor => {
       if (!busyRef.current) {
         const { from, to } = editor.state.selection.main
         runRef.current(from === to ? editor.state.doc.toString() : editor.state.sliceDoc(from, to))
       }
       return true
-    } }]),
+    } }])),
     EditorView.theme({ '&': { backgroundColor: '#171b22', fontSize: '14px' }, '.cm-gutters': { backgroundColor: '#171b22', borderRight: '1px solid #2a303a' }, '.cm-content': { padding: '20px 0', fontFamily: '"SFMono-Regular", Consolas, monospace', lineHeight: '1.9' }, '.cm-line': { padding: '0 20px' }, '&.cm-focused': { outline: 'none' } }),
   ], [])
   return <section className="panel editor-panel" aria-labelledby="editor-title">

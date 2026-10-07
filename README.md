@@ -91,7 +91,9 @@ pnpm dev                      # API（127.0.0.1:3001）+ Vite（127.0.0.1:5173�
 lsof -nP -iTCP:5173 -sTCP:LISTEN
 lsof -nP -iTCP:3001 -sTCP:LISTEN
 lsof -nP -iTCP:5433 -sTCP:LISTEN
-# 別のポートにしたい場合は .env の API_PORT / PGPORT を変える
+# 別のポートで開発サーバーを起動する（DB は別途起動）
+PGPORT=5438 docker compose -p sql-dojo-qa up -d --wait
+PGPORT=5438 API_PORT=3002 WEB_PORT=5174 pnpm dev
 docker compose ps
 docker compose logs db
 ```
@@ -123,7 +125,7 @@ PGPORT=5437 docker compose -p sql-dojo-gate down -v
 
   - `PGPORT` で接続先、`LESSON_CHAPTERS` で教材の範囲を指定します。
   - `-p <名前>`（`COMPOSE_PROJECT_NAME` でも可）でコンテナー名とボリュームが分離され、複数の検証環境を並べられます。
-  - Vite のプロキシーは API :3001 固定なので、並列で API も起動する場合は `vite.config.ts` を調整してください。
+  - Vite のプロキシー先は `API_PORT`、画面のポートは `WEB_PORT` で変更できます。
 
 - 教材: `lessons/chNN.ts` が本体で、`lessons/index.ts` が唯一のソース（`GET /api/lessons` で配信）。採点は `POST /api/lessons/check`、章の開始状態への再生は `POST /api/reset {toChapter}`（0 で全リセット、13 で全章再生）。共通データは `lessons/data/*.sql`（`-- @include` / `-- @csv` はサーバーが展開）。契約は `docs/schema-contract.md`、執筆手順は `docs/lesson-authoring.md`。
 - UI: `src/pages/*.tsx` の `export const page` と `src/panels/*.tsx` の `export const panel` が glob で自動登録されます（`order` で並び順）。

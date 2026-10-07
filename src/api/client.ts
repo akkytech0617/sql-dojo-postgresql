@@ -1,6 +1,6 @@
-import type { ConnectionInfo, HealthResponse, QueryResponse, SessionStatus, SqlError } from '../shared/types'
-import type { Chapter, CheckRequest, CheckResponse, ResetResponse, SessionId } from '../shared/lessons'
-import type { MonitorResponse } from '../shared/monitor'
+import type { ConnectionInfo, HealthResponse, QueryResponse, SessionStatus, SqlError } from '../shared/types.js'
+import type { Chapter, CheckRequest, CheckResponse, ResetResponse, SessionId } from '../shared/lessons.js'
+import type { MonitorResponse } from '../shared/monitor.js'
 export class ApiError extends Error {
   constructor(message: string, public readonly sqlError?: SqlError) { super(message); this.name = 'ApiError' }
 }
@@ -12,7 +12,7 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
     })
   } catch { throw new ApiError('API に接続できません。開発サーバーを確認してください。') }
   const data: unknown = await response.json().catch(() => null)
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+  if (!data || typeof data !== 'object') {
     // A non-JSON body (proxy error page, crashed handler) must not surface as a SyntaxError.
     throw new ApiError(`API から予期しない応答がありました（HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}）。`)
   }

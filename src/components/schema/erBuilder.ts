@@ -19,7 +19,7 @@ export function buildErDiagram(schema: string, tables: SchemaTable[]): string {
       const flags = [
         table.primaryKey.includes(column.name) ? 'PK' : '',
         table.foreignKeys.some(foreignKey => foreignKey.columnNames.includes(column.name)) ? 'FK' : '',
-      ].filter(Boolean).join(' ')
+      ].filter(Boolean).join(', ')
       lines.push(`    ${mermaidType(column.dataType)} ${column.name}${flags ? ` ${flags}` : ''}`)
     }
     lines.push('  }')

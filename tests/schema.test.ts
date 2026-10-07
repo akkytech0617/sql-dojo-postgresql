@@ -107,6 +107,8 @@ describe('schema browser API (real PostgreSQL)', () => {
     expect(diagram).toContain('  books {')
     expect(diagram).toContain('    integer book_id PK')
     expect(diagram).toContain('    integer category_id FK')
+    expect(diagram).toContain('    integer book_id PK, FK')
+    expect(diagram).not.toContain(' PK FK')
     expect(diagram).toContain('  books }o--|| categories : "books_category_id_fkey ON DELETE RESTRICT"')
     expect(diagram).toContain('  book_authors }o--|| authors : "book_authors_author_id_fkey ON DELETE RESTRICT"')
     expect(diagram).toContain('  loans }o--|| copies : "loans_copy_id_fkey ON DELETE RESTRICT"')

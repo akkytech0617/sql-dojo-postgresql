@@ -17,7 +17,7 @@ export function createApp(manager: SessionManager, chapters?: Chapter[]) {
   app.use('/api/*', bodyLimit({ maxSize: 1_100_000, onError: c => c.json({ message: 'リクエストが大きすぎます。' }, 413) }))
   app.use('/api/*', async (c, next) => {
     const origin = c.req.header('Origin')
-    const ports = [5173, config.apiPort]
+    const ports = [config.webPort, config.apiPort]
     const allowed = ports.flatMap(port => [`http://127.0.0.1:${port}`, `http://localhost:${port}`])
     if (origin && !allowed.includes(origin)) return c.json({ message: 'このオリジンからの操作は許可されていません。' }, 403)
     // DNS rebinding guard: a rebound hostname resolves here with the attacker's Host header.

@@ -23,7 +23,7 @@ describe('PostgreSQL API (real database)', () => {
     expect(sessions.map(session => session.id)).toEqual(['admin', 'A', 'B'])
   })
   it('allowlists Host headers to block DNS rebinding reads', async () => {
-    const allowed = [`localhost:${config.apiPort}`, `127.0.0.1:5173`, 'localhost:5173']
+    const allowed = [`localhost:${config.apiPort}`, `127.0.0.1:${config.webPort}`, `localhost:${config.webPort}`]
     for (const value of allowed) expect((await app.request('/api/health', { headers: { Host: value } })).status).toBe(200)
     for (const evil of ['evil.example.com', 'localhost:8080', '127.0.0.1:1', 'sub.localhost:3001']) {
       expect((await app.request('/api/health', { headers: { Host: evil } })).status).toBe(403)
