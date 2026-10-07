@@ -1,28 +1,33 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { createApp } from '../server/app.js'
+import { config } from '../server/config.js'
 import { chapters } from '../lessons/index.js'
-import { readBootstrap, withBootstrap } from './helpers/bootstrap.js'
 import { SessionManager } from '../server/sessions.js'
 import type { PrivilegesResponse, TablePrivilege } from '../src/shared/privileges.js'
 
-/** Chapter 7-9 are stubs in this worktree: bootstrap their contract objects, then replay ch0-10. */
+/** The viewer reads the real ch10 end state, so replay the real ch0-10 lessons first. */
 const manager = new SessionManager()
-const app = createApp(manager, withBootstrap(chapters, 10, readBootstrap('tests/fixtures/bootstrap-ch07-09.sql')))
+const app = createApp(manager, chapters)
+// Hono's app.request() sends no Host header, but the API requires an allowlisted one.
+const host = `127.0.0.1:${config.apiPort}`
 
 async function fetchPrivileges(query = '?database=library'): Promise<PrivilegesResponse> {
-  const response = await app.request(`/api/privileges${query}`)
+  const response = await app.request(`/api/privileges${query}`, { headers: { Host: host } })
   const data: unknown = await response.json()
   expect(response.status, JSON.stringify(data)).toBe(200)
   return data as PrivilegesResponse
 }
 
 describe('privileges viewer API (ch10 end state)', () => {
-  it('prepares chapter 11: replays ch0-10 with the ch7-9 bootstrap', async () => {
-    const response = await app.request('/api/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toChapter: 11 }) })
+  it('prepares chapter 11 by replaying the real ch0-10 lessons', async () => {
+    const response = await app.request('/api/reset', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify({ toChapter: 11 }),
+    })
     expect(response.status).toBe(200)
     const result = await response.json() as { replayedSteps: string[] }
-    expect(result.replayedSteps).toContain('ch10-15')
-    expect(result.replayedSteps).toContain('ch09-99')
+    expect(result.replayedSteps).toContain('ch08-11')   // ch8 ends with the index/plan steps
+    expect(result.replayedSteps).toContain('ch10-05')   // column-level grants
+    expect(result.replayedSteps).toContain('ch10-17')   // chapter end: back to the admin account
   })
 
   it('reports roles, login attributes and memberships', async () => {
@@ -146,9 +151,9 @@ describe('privileges viewer API (ch10 end state)', () => {
   })
 
   it('validates the database name and serves other databases', async () => {
-    expect((await app.request('/api/privileges?database=no_such_db')).status).toBe(400)
-    expect((await app.request('/api/privileges?database=template0')).status).toBe(400)   // exists but datallowconn = false
-    expect((await app.request('/api/privileges?database=' + 'x'.repeat(65))).status).toBe(400)
+    expect((await app.request('/api/privileges?database=no_such_db', { headers: { Host: host } })).status).toBe(400)
+    expect((await app.request('/api/privileges?database=template0', { headers: { Host: host } })).status).toBe(400)   // exists but datallowconn = false
+    expect((await app.request('/api/privileges?database=' + 'x'.repeat(65), { headers: { Host: host } })).status).toBe(400)
     const defaultParam = await fetchPrivileges()                                        // defaults to library
     expect(defaultParam.database).toBe('library')
     const postgres = await fetchPrivileges('?database=postgres')

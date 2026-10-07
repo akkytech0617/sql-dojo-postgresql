@@ -49,28 +49,11 @@ pnpm lint
 範囲開始前の章をreplayして状態を準備。範囲の解答を順に実行し各stepを採点、
 各章末のschema/column/constraint/index/view/function/trigger/role/ACL/RLS fingerprintと
 resetで再生した同じ章末を比較。データそのものの同値は各章の検査も書く。
-先行章がまだstubなら後続章テストは動かない（完成後に再実行）。
+ch0–12はすべて執筆済みなので、範囲開始前の状態は実章の replay だけで用意できる。
+（先行章が未完成のときに使っていた `LESSON_BOOTSTRAP` / `tests/fixtures/bootstrap-ch07-09.sql` /
+`tests/bootstrap.test.ts` / `tests/helpers/bootstrap.ts` は不要になったため削除した。）
 
-### 先行章が未完成のとき: LESSON_BOOTSTRAP（一時的な補助）
-
-`LESSON_BOOTSTRAP=<.sqlのパス>` を指定すると、範囲開始前の章を再生した直後に、
-その SQL を管理者で `library` に実行します（既存の tokenizer で文を分割）。
-実装上は「範囲開始の直前の章」の末尾に replay 専用ステップ（`chNN-99`）を差し込むため、
-解答実行側と replay fingerprint 側の両方に同じ位置で適用され、比較は有効なままです。
-範囲は ch2 以降から始める必要があります（`library` が必要）。
-
-```sh
-# W5: ch7–9 が stub のワークツリーで ch10–12 を検証
-PGPORT=5436 LESSON_CHAPTERS=10-12 LESSON_BOOTSTRAP=tests/fixtures/bootstrap-ch07-09.sql pnpm test:lessons
-```
-
-`tests/fixtures/bootstrap-ch07-09.sql` は契約どおりの ch7 オブジェクト（view/MV/関数/トリガー/
-プロシージャ）と ch8 の `loan_history` 100万行＋4索引＋ANALYZE を、ch3 終了状態の上に作ります。
-**ch7–9 が未執筆の間だけ有効な一時的な補助**です。本物の ch7–9 が揃ったら指定せずに実行してください
-（両方を同時に使うと重複作成になります。定義本文も本物の章と一致する保証はありません）。
-bootstrap 自体の検証（重い・破壊的なので既定では skip）:
-`BOOTSTRAP_SELFTEST=1 PGPORT=<自分のポート> pnpm vitest run tests/bootstrap.test.ts`。
-test:lessonsはfixtureも実行し、終了時DBは最後のテストの状態（全リセットされる場合もある）。
+test:lessonsは教材を実行し、終了時DBは最後のテストの状態（全リセットされる場合もある）。
 pnpm testは全テスト、ファイル並列なし。ローカルDBは破壊的にリセットされる。
 
 通常テストは管理者solution、connectでlesson roleにも実際にTCP接続。
