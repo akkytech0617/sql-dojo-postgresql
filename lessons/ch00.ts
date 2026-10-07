@@ -1,9 +1,9 @@
 import type { Chapter } from '../src/shared/lessons.js'
 const chapter: Chapter = {
-  id: 0, title: 'はじめに', summary: '市立図書館の仕事を題材に、RDB と SQL の入口を学びます。',
+  id: 0, title: 'はじめに', summary: '図書館の仕事を題材に、RDB と SQL の入口を学びます。',
   steps: [
     { id: 'ch00-01', title: '図書館の情報を表でつなぐ', database: 'postgres', session: 'A',
-      story: '市立図書館の司書になりました。本・会員・貸出を安全に管理する仕組みを作りましょう。',
+      story: '図書館の司書になりました。本・会員・貸出を安全に管理する仕組みを作りましょう。',
       explanation: '## リレーショナルデータベースとは\n情報を **表（テーブル）** の行と列で管理し、キーで表を関連付けます。\n\n本のタイトルと、棚にある一冊（蔵書）は別の情報です。重複を減らし、矛盾を防ぐ設計を学びます。',
       task: '左でステップを選び、右の SQL エディターで実行します。採点後に次へ進みましょう。自由練習も使えます。',
       hints: [], solution: '', replay: '', check: { type: 'manual' },

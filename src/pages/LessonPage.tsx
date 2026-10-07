@@ -162,7 +162,7 @@ function Workspace({ step, onPassed, onBusy, workCollapsed, onExpandWork }: { st
       </div>}
     </div>}
     <article className="lesson-reading">
-    <p className="eyebrow">{step.id} / 市立図書館の業務から学ぶ</p><h1>{step.title}</h1>
+    <p className="eyebrow">{step.id} / 図書館の業務から学ぶ</p><h1>{step.title}</h1>
     {step.story && <div className="lesson-story"><Md text={step.story} /></div>}
     <Md text={step.explanation} />
     <section className="lesson-task"><h2>今回の課題</h2><Md text={step.task} /></section>
@@ -218,7 +218,7 @@ export function LessonPage() {
     } catch (error) { setMessage(String(error)) } finally { setResetting(false) }
   }
   const next = allSteps[allSteps.findIndex(item => item.id === step?.id) + 1]
-  return <main className="lesson-page"><aside className="lesson-sidebar"><div className="lesson-sidebar-heading"><p className="eyebrow">SQL道場 / 学習コース</p><h2>市立図書館を作ろう</h2><p className="muted small">{progress.length} / {allSteps.length} ステップ完了</p></div>
+  return <main className="lesson-page"><aside className="lesson-sidebar"><div className="lesson-sidebar-heading"><p className="eyebrow">SQL道場 / 学習コース</p><h2>図書館を作ろう</h2><p className="muted small">{progress.length} / {allSteps.length} ステップ完了</p></div>
     <nav aria-label="章とステップ">{chapters.map(item => <details key={item.id} open={item.id === chapter?.id || undefined}><summary>{String(item.id).padStart(2, '0')} {item.title}</summary>{item.steps.length ? item.steps.map(item => <button key={item.id} className={step?.id === item.id ? 'selected-step' : ''} aria-current={step?.id === item.id ? 'step' : undefined} disabled={busy || resetting} onClick={() => setSelected(item.id)}><span>{progress.includes(item.id) ? '✓' : '○'}</span>{item.title}</button>) : <p className="muted small stub-label">教材を準備中</p>}</details>)}</nav>
     <button className="danger-button" disabled={busy || resetting} onClick={() => { void reset(0) }}>全部リセット</button>
   </aside><div className="lesson-main"><header className="lesson-toolbar"><span>{chapter?.title ?? '学習コース'}</span><button disabled={busy || resetting || !chapter} onClick={() => { void reset(chapter?.id ?? 0) }}>{resetting ? '状態を再生中…' : '章の最初からやり直す'}</button><button aria-pressed={workCollapsed} onClick={() => setWorkCollapsed(value => !value)}>{workCollapsed ? '◂ SQL作業エリアを表示' : 'SQL作業エリアを折りたたむ ▸'}</button>{next && <button className="primary" disabled={busy || resetting || !step} title={step && !progress.includes(step.id) ? 'このステップは未合格ですが、先に進めます' : undefined} onClick={() => { setSelected(next.id); window.scrollTo({ top: 0 }) }}>次へ →</button>}</header>

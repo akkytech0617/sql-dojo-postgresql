@@ -4,7 +4,7 @@ const chapter: Chapter = {
   steps: [
     { id: 'ch01-01', title: 'library データベースを作る', database: 'postgres', session: 'A',
       connect: { A: { user: 'admin', password: '', database: 'postgres' } },
-      story: '市立図書館にシステム担当として着任しました。紙の台帳と表計算ソフトで管理していた書籍・会員・貸出記録を PostgreSQL へ移すことが決まっています。初日の仕事は、図書館業務専用のデータベースを作ることです。',
+      story: '図書館にシステム担当として着任しました。紙の台帳と表計算ソフトで管理していた書籍・会員・貸出記録を PostgreSQL へ移すことが決まっています。初日の仕事は、図書館業務専用のデータベースを作ることです。',
       explanation: '## データベースは何を区切るものか\nPostgreSQL のサーバー（クラスター）の中には、複数の**データベース**を作れます。データベースどうしはデータも権限も完全に分離されていて、他のデータベースの表を直接見ることはできません。\n\n実務では「1つの用途につき1つのデータベース」が基本です。library 以外のシステム（例: 職員給与）が同じサーバーに載っていても、誤って図書館のデータを壊せないように分けておきます。\n\n## 今回の文\n```sql\nCREATE DATABASE library WITH ENCODING \'UTF8\' LOCALE \'C\' TEMPLATE template0;\n```\n- `ENCODING \'UTF8\'` — 文字コード。書名や著者名に日本語が入るので、世界標準の UTF8 を指定します。\n- `LOCALE \'C\'` — 文字の並べ替え規則。`C` は「バイト順で比較する」を意味し、OS の言語設定に依存しません。実務では、OS の照合順序ライブラリの更新でインデックスが壊れる事故が知られているため、アプリケーション用のデータベースでは `C` を選ぶことが多くなっています。\n- `TEMPLATE template0` — 雛形。既定の template1 には管理者が作ったオブジェクトが紛れ込むことがあるので、まっさらな template0 を使います。エンコーディングやロケールを既定から変えるときは template0 が必須です。\n\nCREATE DATABASE はトランザクションの中で実行できない（失敗しても途中で止める仕組みがない）ため、**必ず単独の文として実行**します。エディターで他の SQL と同じ送信に混ぜると `25001` エラーになります。',
       task: 'セッション A が postgres（サーバー管理用の既定データベース）に接続していることを確認して、library を作成してください。',
       hints: ['CREATE DATABASE データベース名; が基本形です。', "WITH ENCODING 'UTF8' LOCALE 'C' TEMPLATE template0 を付けます。", 'CREATE DATABASE は必ず単独の文で実行します。他の文と一緒に送らないでください。'],
