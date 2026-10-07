@@ -1,4 +1,4 @@
-.lesson-page { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: calc(100vh - 80px); }
+.lesson-page { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: calc(100vh - 48px); }
 .lesson-sidebar { border-right: 1px solid #303743; background: #15191f; padding: 24px 16px; }
 .lesson-sidebar-heading { padding: 0 8px 24px; }
 .lesson-sidebar-heading h2 { font-size: 16px; margin-bottom: 8px; }
