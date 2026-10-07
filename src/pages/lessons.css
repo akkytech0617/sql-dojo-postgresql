@@ -55,6 +55,12 @@
 .dock-tabs button[aria-selected=true] { border-bottom-color: #a3ddc1; color: #a3ddc1; }
 .panel-dock [role=tabpanel] { padding: 16px; }
 .lesson-dock { grid-column: 1 / -1; }
+.lesson-editors[hidden] { display: none; }
+.lesson-workspace.work-collapsed, .lesson-workspace.work-collapsed:has(.dual-session) { grid-template-columns: minmax(0, 1fr) 44px; }
+.work-collapsed .lesson-reading { max-width: 960px; }
+.lesson-work-rail { position: sticky; top: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; min-height: 240px; padding: 12px 0; font-size: 12px; }
+.lesson-work-rail-label { writing-mode: vertical-rl; letter-spacing: .1em; }
+.lesson-work-rail-busy { writing-mode: vertical-rl; color: #e8c37a; }
 @media (min-width: 1700px) { .lesson-editors.dual-session { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lesson-workspace:has(.dual-session) { grid-template-columns: minmax(320px, .7fr) minmax(840px, 1.8fr); } }
-@media (max-width: 1200px) { .lesson-workspace { grid-template-columns: 1fr; } .lesson-editors.dual-session { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1200px) { .lesson-workspace, .lesson-workspace.work-collapsed, .lesson-workspace.work-collapsed:has(.dual-session) { grid-template-columns: 1fr; } .lesson-work-rail { position: static; flex-direction: row; justify-content: center; min-height: 0; } .lesson-work-rail-label, .lesson-work-rail-busy { writing-mode: horizontal-tb; } .lesson-editors.dual-session { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 800px) { .lesson-page { grid-template-columns: 1fr; } .lesson-sidebar { border-right: 0; border-bottom: 1px solid #303743; } .lesson-sidebar nav { max-height: 240px; overflow-y: auto; } .lesson-main { padding: 0 16px 24px; } .lesson-editors.dual-session { grid-template-columns: 1fr; } }

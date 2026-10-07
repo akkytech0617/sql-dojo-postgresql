@@ -17,7 +17,11 @@ function savedProgress(): string[] {
 }
 function Md({ text }: { text: string }) { return <div className="lesson-markdown"><Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown></div> }
 const emptyResponse = (): QueryResponse => ({ results: [], notices: [] })
-function Workspace({ step, onPassed, onBusy }: { step: Step; onPassed: () => void; onBusy: (busy: boolean) => void }) {
+const workCollapsedKey = 'sql-dojo-work-collapsed-v1'
+function savedWorkCollapsed(): boolean {
+  try { return localStorage.getItem(workCollapsedKey) === '1' } catch { return false }
+}
+function Workspace({ step, onPassed, onBusy, workCollapsed, onExpandWork }: { step: Step; onPassed: () => void; onBusy: (busy: boolean) => void; workCollapsed: boolean; onExpandWork: () => void }) {
   const ids: SessionId[] = useMemo(() => step.session === 'AB' ? ['A', 'B'] : [step.session], [step.session])
   const [sql, setSql] = useState<Record<SessionId, string>>({ A: '', B: '' })
   const [responses, setResponses] = useState<Record<SessionId, QueryResponse>>({ A: emptyResponse(), B: emptyResponse() })
@@ -148,7 +152,8 @@ function Workspace({ step, onPassed, onBusy }: { step: Step; onPassed: () => voi
     } catch (error) { setMessage(String(error)) } finally { setGrading(false) }
   }
   const anyBusy = busy.A || busy.B
-  return <div className="lesson-workspace">
+  const insertSql = (id: SessionId, text: string) => { setSql(value => ({ ...value, [id]: text })); onExpandWork() }
+  return <div className={`lesson-workspace ${workCollapsed ? 'work-collapsed' : ''}`}>
     {(entryResetNote || entryOpen.length > 0) && <div className="lesson-entry-state" role="status">
       {entryResetNote && <p className="feedback lesson-toast">{entryResetNote}</p>}
       {entryOpen.length > 0 && <div className="lesson-entry-rollback">
@@ -166,15 +171,18 @@ function Workspace({ step, onPassed, onBusy }: { step: Step; onPassed: () => voi
     {step.script && <ol className="script-guide">{step.script.map((action, index) => <li key={index} className={completed[index] ? 'script-done' : ''}>
       <strong>{completed[index] ? '✓ ' : ''}セッション {action.session} — {typeof action.expect === 'object' ? `エラー ${action.expect.errorCode}` : action.expect === 'blocks' ? 'ロック待ちを観察' : '実行'}</strong>
       {action.note && <p>{action.note}</p>}<pre><code>{action.sql}</code></pre>
-      <button disabled={busy[action.session] || (index > 0 && !completed[index - 1])} onClick={() => setSql(value => ({ ...value, [action.session]: action.sql }))}>このSQLを挿入</button>
+      <button disabled={busy[action.session] || (index > 0 && !completed[index - 1])} onClick={() => insertSql(action.session, action.sql)}>このSQLを挿入</button>
     </li>)}</ol>}
     <div className="lesson-help"><button disabled={hintCount >= step.hints.length} onClick={() => setHintCount(value => value + 1)}>ヒントを見る ({hintCount}/{step.hints.length})</button>{step.hints.slice(0, hintCount).map((hint, index) => <Md key={index} text={hint} />)}
-      <details><summary>模範解答</summary><pre><code>{step.solution || 'このステップに SQL の入力はありません。'}</code></pre>{step.solution && <button onClick={() => setSql(value => ({ ...value, [ids[0]]: step.solution }))}>エディタに挿入</button>}</details>
+      <details><summary>模範解答</summary><pre><code>{step.solution || 'このステップに SQL の入力はありません。'}</code></pre>{step.solution && <button onClick={() => insertSql(ids[0], step.solution)}>エディタに挿入</button>}</details>
       {step.mysqlNote && <details><summary>MySQLでは？</summary><Md text={step.mysqlNote} /></details>}
     </div>
     <button className="primary" disabled={anyBusy || grading} onClick={() => { void grade() }}>{grading ? '採点中…' : passed ? '✓ 合格・もう一度採点' : step.check.type === 'manual' ? '読みました・次へ進む準備' : '採点する'}</button>
     {message && <p className={`feedback lesson-toast ${passed ? 'passed' : ''}`} role="status">{message}</p>}
-  </article><div className={`lesson-editors ${ids.length === 2 ? 'dual-session' : ''}`}>{ids.map(id => <section key={id} className="lesson-session" aria-label={`セッション ${id}`}>
+  </article>
+  {workCollapsed && <button className="lesson-work-rail" onClick={onExpandWork} aria-label="SQL作業エリアを開く" title="SQL作業エリアを開く"><span aria-hidden="true">◂</span><span className="lesson-work-rail-label">SQL作業エリアを開く</span>{anyBusy && <span className="lesson-work-rail-busy">実行中</span>}</button>}
+  {/* Hidden rather than unmounted so editor text, results and running queries survive a collapse. */}
+  <div className={`lesson-editors ${ids.length === 2 ? 'dual-session' : ''}`} hidden={workCollapsed}>{ids.map(id => <section key={id} className="lesson-session" aria-label={`セッション ${id}`}>
     <SessionBar id={id} status={statuses.find(status => status.id === id)} running={busy[id]} connecting={false}
       onConnect={info => connection(id, info)}
       onDisconnect={async () => { try { await api.disconnect(id); await refresh() } catch (error) { setMessage(String(error)) } }}
@@ -191,7 +199,10 @@ export function LessonPage() {
   const [resetting, setResetting] = useState(false)
   const [busy, setBusy] = useState(false)
   const [generation, setGeneration] = useState(0)
+  const [workCollapsed, setWorkCollapsed] = useState(savedWorkCollapsed)
+  const expandWork = useCallback(() => setWorkCollapsed(false), [])
   useEffect(() => { void api.lessons().then(setChapters).catch(error => setMessage(String(error))) }, [])
+  useEffect(() => { try { localStorage.setItem(workCollapsedKey, workCollapsed ? '1' : '0') } catch { /* Storage may be disabled. */ } }, [workCollapsed])
   useEffect(() => { try { localStorage.setItem(storageKey, JSON.stringify(progress)) } catch { /* Storage may be disabled. */ } }, [progress])
   const allSteps = chapters.flatMap(chapter => chapter.steps)
   const step = allSteps.find(step => step.id === selected) ?? allSteps[0]
@@ -210,9 +221,9 @@ export function LessonPage() {
   return <main className="lesson-page"><aside className="lesson-sidebar"><div className="lesson-sidebar-heading"><p className="eyebrow">SQL道場 / 学習コース</p><h2>市立図書館を作ろう</h2><p className="muted small">{progress.length} / {allSteps.length} ステップ完了</p></div>
     <nav aria-label="章とステップ">{chapters.map(item => <details key={item.id} open={item.id === chapter?.id || undefined}><summary>{String(item.id).padStart(2, '0')} {item.title}</summary>{item.steps.length ? item.steps.map(item => <button key={item.id} className={step?.id === item.id ? 'selected-step' : ''} aria-current={step?.id === item.id ? 'step' : undefined} disabled={busy || resetting} onClick={() => setSelected(item.id)}><span>{progress.includes(item.id) ? '✓' : '○'}</span>{item.title}</button>) : <p className="muted small stub-label">教材を準備中</p>}</details>)}</nav>
     <button className="danger-button" disabled={busy || resetting} onClick={() => { void reset(0) }}>全部リセット</button>
-  </aside><div className="lesson-main"><header className="lesson-toolbar"><span>{chapter?.title ?? '学習コース'}</span><button disabled={busy || resetting || !chapter} onClick={() => { void reset(chapter?.id ?? 0) }}>{resetting ? '状態を再生中…' : '章の最初からやり直す'}</button>{next && <button disabled={busy || resetting || !step || !progress.includes(step.id)} onClick={() => setSelected(next.id)}>次へ →</button>}</header>
+  </aside><div className="lesson-main"><header className="lesson-toolbar"><span>{chapter?.title ?? '学習コース'}</span><button disabled={busy || resetting || !chapter} onClick={() => { void reset(chapter?.id ?? 0) }}>{resetting ? '状態を再生中…' : '章の最初からやり直す'}</button><button aria-pressed={workCollapsed} onClick={() => setWorkCollapsed(value => !value)}>{workCollapsed ? '◂ SQL作業エリアを表示' : 'SQL作業エリアを折りたたむ ▸'}</button>{next && <button className="primary" disabled={busy || resetting || !step} title={step && !progress.includes(step.id) ? 'このステップは未合格ですが、先に進めます' : undefined} onClick={() => { setSelected(next.id); window.scrollTo({ top: 0 }) }}>次へ →</button>}</header>
     {message && <p className="feedback" role="status">{message}</p>}
-    {!chapters.length ? <p className="muted">教材を読み込んでいます…</p> : step && !resetting && <Workspace key={`${generation}-${step.id}`} step={step} onBusy={setBusy} onPassed={() => setProgress(value => value.includes(step.id) ? value : [...value, step.id])} />}
+    {!chapters.length ? <p className="muted">教材を読み込んでいます…</p> : step && !resetting && <Workspace key={`${generation}-${step.id}`} step={step} onBusy={setBusy} workCollapsed={workCollapsed} onExpandWork={expandWork} onPassed={() => setProgress(value => value.includes(step.id) ? value : [...value, step.id])} />}
   </div></main>
 }
 export const page = { id: 'lessons', label: '学習コース', component: LessonPage, order: 0 }
