@@ -13,6 +13,9 @@ interface Session {
   busy: boolean
   lazy: boolean
 }
+/** A runaway learner query (e.g. a cross join) is cancelled after 5 minutes instead of holding the session forever. */
+export const STATEMENT_TIMEOUT_MS = 300_000
+const MAX_NOTICES = 1000
 function sessionError(code: string, message: string) { return Object.assign(new Error(message), { code }) }
 function protocolConnection(client: Client): EventEmitter {
   return (client as unknown as { connection: EventEmitter }).connection
@@ -38,7 +41,9 @@ export class SessionManager {
     session.tx = 'unknown'
   }
   private makeClient(info: ConnectionInfo) {
-    return new Client({ host: config.host, port: config.port, ...info, connectionTimeoutMillis: 5000, application_name: 'sql-dojo' })
+    // statement_timeout is a startup parameter, so RESET ALL returns to it rather than to 0 (no limit).
+    return new Client({ host: config.host, port: config.port, ...info, connectionTimeoutMillis: 5000,
+      application_name: 'sql-dojo', statement_timeout: STATEMENT_TIMEOUT_MS })
   }
   private async open(session: Session, info: ConnectionInfo) {
     const old = session.client
@@ -94,7 +99,14 @@ export class SessionManager {
     if (session.busy) throw sessionError('55006', 'このセッションでは別の SQL が実行中です。')
     session.busy = true
     const notices: SqlNotice[] = []
-    const noticeListener = (notice: { severity?: string; message?: string }) => notices.push({ severity: notice.severity ?? 'NOTICE', message: notice.message ?? '' })
+    let droppedNotices = 0
+    const noticeListener = (notice: { severity?: string; message?: string }) => {
+      if (notices.length < MAX_NOTICES) notices.push({ severity: notice.severity ?? 'NOTICE', message: notice.message ?? '' })
+      else droppedNotices++
+    }
+    const noticeSummary = () => droppedNotices
+      ? [...notices, { severity: 'NOTICE', message: `ほかに ${droppedNotices} 件の通知を省略しました（最大 ${MAX_NOTICES} 件まで表示）。` }]
+      : notices
     let client: Client | null = null
     const started = performance.now()
     try {
@@ -121,12 +133,12 @@ export class SessionManager {
       }
       const results: PgResult[] = Array.isArray(response) ? response : [response]
       const durationMs = Math.round((performance.now() - started) * 100) / 100
-      return { notices, results: results.map(result => ({
+      return { notices: noticeSummary(), results: results.map(result => ({
         command: result.command, rowCount: result.rowCount,
         fields: result.fields.map(({ name, dataTypeID }) => ({ name, dataTypeID })),
         rows: result.rows.slice(0, 1000), truncated: result.rows.length > 1000, durationMs,
       })) }
-    } catch (error) { return { results: [], notices, error: serializeSqlError(error) } }
+    } catch (error) { return { results: [], notices: noticeSummary(), error: serializeSqlError(error) } }
     finally { client?.removeListener('notice', noticeListener); session.busy = false }
   }
   async cancel(id: string): Promise<boolean> {

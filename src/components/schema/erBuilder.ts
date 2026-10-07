@@ -8,10 +8,32 @@ export function mermaidType(dataType: string): string {
   const base = dataType.replace(/\(.*\)/, '').trim()
   return (typeAliases[base] ?? base).replace(/[^a-zA-Z0-9_]/g, '_') || 'text'
 }
+/**
+ * Quoted PostgreSQL identifiers may contain anything ("a {b", newlines, %%{init}%%). Inside the
+ * mermaid source they would break the diagram or inject directives, so only word characters
+ * (including non-ASCII letters, which mermaid accepts) survive and the rest become "_".
+ */
+export function mermaidIdentifier(name: string): string {
+  const safe = name.replace(/[^\p{L}\p{N}_]/gu, '_')
+  return /^[\p{L}_]/u.test(safe) ? safe : `_${safe}`
+}
+function mermaidLabel(text: string): string {
+  return text.replace(/["%\\\p{Cc}]/gu, '_')
+}
 /** Builds an erDiagram definition for one schema: PK/FK marked columns plus }o--|| FK edges. */
 export function buildErDiagram(schema: string, tables: SchemaTable[]): string {
   const entities = tables.filter(table => table.kind === 'table' || table.kind === 'partitioned')
-  const nameOf = (table: SchemaTable) => (schema === 'public' ? table.name : `${schema}_${table.name}`)
+  // Sanitizing can map two tables ("a b", a_b) to one name; a suffix keeps them separate entities.
+  const names = new Map<SchemaTable, string>()
+  const used = new Set<string>()
+  for (const table of entities) {
+    const base = mermaidIdentifier(schema === 'public' ? table.name : `${schema}_${table.name}`)
+    let name = base
+    for (let n = 2; used.has(name); n++) name = `${base}_${n}`
+    used.add(name)
+    names.set(table, name)
+  }
+  const nameOf = (table: SchemaTable) => names.get(table)!
   const lines = ['erDiagram']
   for (const table of entities) {
     lines.push(`  ${nameOf(table)} {`)
@@ -20,13 +42,13 @@ export function buildErDiagram(schema: string, tables: SchemaTable[]): string {
         table.primaryKey.includes(column.name) ? 'PK' : '',
         table.foreignKeys.some(foreignKey => foreignKey.columnNames.includes(column.name)) ? 'FK' : '',
       ].filter(Boolean).join(', ')
-      lines.push(`    ${mermaidType(column.dataType)} ${column.name}${flags ? ` ${flags}` : ''}`)
+      lines.push(`    ${mermaidType(column.dataType)} ${mermaidIdentifier(column.name)}${flags ? ` ${flags}` : ''}`)
     }
     lines.push('  }')
   }
   for (const table of entities) for (const foreignKey of table.foreignKeys) {
     const parent = entities.find(entity => entity.schema === foreignKey.referencesSchema && entity.name === foreignKey.referencesTable)
-    if (parent) lines.push(`  ${nameOf(table)} }o--|| ${nameOf(parent)} : "${foreignKey.name} ON DELETE ${foreignKey.onDelete}"`)
+    if (parent) lines.push(`  ${nameOf(table)} }o--|| ${nameOf(parent)} : "${mermaidLabel(foreignKey.name)} ON DELETE ${foreignKey.onDelete}"`)
   }
   return lines.join('\n')
 }

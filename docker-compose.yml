@@ -1,6 +1,7 @@
 services:
   db:
-    image: postgres:18
+    # Pinned to a minor release so every learner gets the same server; Dependabot proposes updates.
+    image: postgres:18.6
     container_name: ${COMPOSE_PROJECT_NAME:-sql-dojo}-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-dojo_admin}
@@ -8,6 +9,19 @@ services:
       POSTGRES_DB: postgres
     ports:
       - "127.0.0.1:${PGPORT:-5433}:5432"
+    # Learner SQL runs as a superuser, which can run shell commands inside this container
+    # (COPY ... TO PROGRAM). Keep the container's own privileges as small as postgres allows.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    pids_limit: 512
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:

@@ -31,6 +31,30 @@ describe('PostgreSQL API (real database)', () => {
     // A browser always sends Host; a request without one is not a browser and is rejected too.
     expect((await app.request('/api/health')).status).toBe(403)
   })
+  it('rejects cross-site requests that carry no Origin, using Fetch metadata', async () => {
+    for (const site of ['cross-site', 'same-site']) {
+      expect((await app.request('/api/health', { headers: { Host: host, 'Sec-Fetch-Site': site } })).status).toBe(403)
+    }
+    for (const site of ['same-origin', 'none']) {
+      expect((await app.request('/api/health', { headers: { Host: host, 'Sec-Fetch-Site': site } })).status).toBe(200)
+    }
+  })
+  it('sends anti-framing and no-sniff headers on every response', async () => {
+    for (const response of [await app.request('/api/health', { headers: { Host: host } }), await app.request('/api/health')]) {
+      expect(response.headers.get('X-Frame-Options')).toBe('DENY')
+      expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
+      expect(response.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'none'")
+    }
+  })
+  it('starts sessions with a statement_timeout that RESET ALL keeps', async () => {
+    expect((await query('SHOW statement_timeout')).results[0].rows).toEqual([{ statement_timeout: '5min' }])
+    expect((await query("SET statement_timeout = 0; RESET ALL; SHOW statement_timeout")).results[2].rows).toEqual([{ statement_timeout: '5min' }])
+  })
+  it('caps the number of notices returned for one request', async () => {
+    const result = await query("DO $$ BEGIN FOR i IN 1..1005 LOOP RAISE NOTICE 'n%', i; END LOOP; END $$")
+    expect(result.notices).toHaveLength(1001)
+    expect(result.notices.at(-1)?.message).toContain('ほかに 5 件')
+  })
   it('lazily connects and returns one SELECT with fields and duration', async () => {
     const result = await query('SELECT 42::integer AS answer, NULL::text AS empty')
     expect(result.error).toBeUndefined()

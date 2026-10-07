@@ -138,8 +138,11 @@ PGPORT=5437 docker compose -p sql-dojo-gate down -v
 ## セキュリティ（ローカル専用）
 
 - 外部に公開しません。API・DB・Vite はすべてループバック（127.0.0.1）に限定しています。
-- API は `Host` が `127.0.0.1` / `localhost` の 5173 / 3001 以外なら 403（DNS リバインディング対策）、Origin も同様に検証し、POST は `application/json` のみ受け付けます。
+- API は `Host` が `127.0.0.1` / `localhost` の 5173 / 3001 以外なら 403（DNS リバインディング対策）、Origin も同様に検証し、POST は `application/json` のみ受け付けます。`Sec-Fetch-Site` が `same-origin` / `none` 以外のリクエスト（他サイトの `<img>` など）も 403 です。
+- 画面と API は `X-Frame-Options: DENY` と CSP の `frame-ancestors 'none'` を返し、他サイトの iframe に埋め込めません（クリックジャッキング対策）。
 - 認証はありません。**管理者権限で任意の SQL（`DROP DATABASE` を含む）を実行できます。** 実データや本番の認証情報は接続しないでください。
+- 学習用セッションは PostgreSQL のスーパーユーザーで接続するため、`COPY ... TO PROGRAM` で **DB コンテナー内のシェルコマンドも実行できます**（PostgreSQL の仕様）。影響をコンテナー内に閉じ込めるため、`docker-compose.yml` で `no-new-privileges`・最小限のケーパビリティー・プロセス数の上限を設定しています。コンテナーにホストのディレクトリーをマウントしないでください。
+- 1つの SQL は 5 分で打ち切られます（`statement_timeout`。`SET` で変更できますが、`RESET ALL` で 5 分に戻ります）。1回の実行で返す通知は 1,000 件までです。
 - DB の開発用パスワードは `.env`（リポジトリーには含めません。`.env.example` をコピーして使います）にあります。教材の `lib_*` ロールのパスワード（`lib_app_pw` など）は練習専用です。採点はローカル DB のカタログを見るだけの仕組みで、不正防止の試験基盤ではありません。
 
 ## Factory で作りました
