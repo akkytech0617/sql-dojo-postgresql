@@ -12,7 +12,7 @@
 .lesson-main { min-width: 0; padding: 0 24px 32px; }
 .lesson-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 16px 0; border-bottom: 1px solid #303743; margin-bottom: 24px; }
 .lesson-toolbar > span { margin-right: auto; color: #a9b1bf; font-size: 12px; }
-.lesson-workspace { display: grid; grid-template-columns: minmax(300px, .85fr) minmax(420px, 1.15fr); gap: 24px; align-items: start; }
+.lesson-workspace { display: grid; grid-template-columns: minmax(300px, .85fr) 44px minmax(420px, 1.15fr); gap: 24px 16px; align-items: start; }
 .lesson-reading { min-width: 0; }
 .lesson-reading h1 { font-size: 24px; margin-bottom: 24px; }
 .lesson-story { background: #1b2822; border-left: 3px solid #739b85; padding: 16px; margin-bottom: 24px; color: #c0d6c8; }
@@ -58,9 +58,10 @@
 .lesson-editors[hidden] { display: none; }
 .lesson-workspace.work-collapsed, .lesson-workspace.work-collapsed:has(.dual-session) { grid-template-columns: minmax(0, 1fr) 44px; }
 .work-collapsed .lesson-reading { max-width: 960px; }
-.lesson-work-rail { position: sticky; top: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; min-height: 240px; padding: 12px 0; font-size: 12px; }
+.lesson-work-rail { align-self: stretch; display: flex; flex-direction: column; align-items: center; min-height: 240px; padding: 12px 0; font-size: 12px; }
+.lesson-work-rail-inner { position: sticky; top: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .lesson-work-rail-label { writing-mode: vertical-rl; letter-spacing: .1em; }
 .lesson-work-rail-busy { writing-mode: vertical-rl; color: #e8c37a; }
-@media (min-width: 1700px) { .lesson-editors.dual-session { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lesson-workspace:has(.dual-session) { grid-template-columns: minmax(320px, .7fr) minmax(840px, 1.8fr); } }
-@media (max-width: 1200px) { .lesson-workspace, .lesson-workspace.work-collapsed, .lesson-workspace.work-collapsed:has(.dual-session) { grid-template-columns: 1fr; } .lesson-work-rail { position: static; flex-direction: row; justify-content: center; min-height: 0; } .lesson-work-rail-label, .lesson-work-rail-busy { writing-mode: horizontal-tb; } .lesson-editors.dual-session { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1700px) { .lesson-editors.dual-session { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lesson-workspace:has(.dual-session) { grid-template-columns: minmax(320px, .7fr) 44px minmax(840px, 1.8fr); } }
+@media (max-width: 1200px) { .lesson-workspace, .lesson-workspace.work-collapsed, .lesson-workspace.work-collapsed:has(.dual-session) { grid-template-columns: 1fr; } .lesson-work-rail { flex-direction: row; justify-content: center; min-height: 0; } .lesson-work-rail-inner { position: static; flex-direction: row; } .lesson-work-rail-label, .lesson-work-rail-busy { writing-mode: horizontal-tb; } .lesson-editors.dual-session { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 800px) { .lesson-page { grid-template-columns: 1fr; } .lesson-sidebar { border-right: 0; border-bottom: 1px solid #303743; } .lesson-sidebar nav { max-height: 240px; overflow-y: auto; } .lesson-main { padding: 0 16px 24px; } .lesson-editors.dual-session { grid-template-columns: 1fr; } }
