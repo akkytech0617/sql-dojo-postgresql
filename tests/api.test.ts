@@ -5,8 +5,10 @@ import { SessionManager } from '../server/sessions.js'
 import type { QueryResponse, SessionStatus } from '../src/shared/types.js'
 const manager = new SessionManager()
 const app = createApp(manager)
+// Hono's app.request() sends no Host header, but the API requires an allowlisted one.
+const host = `127.0.0.1:${config.apiPort}`
 function post(path: string, body: unknown = {}) {
-  return app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  return app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify(body) })
 }
 async function query(sql: string, id = 'A'): Promise<QueryResponse> {
   const response = await post(`/sessions/${id}/query`, { sql })
@@ -16,9 +18,18 @@ async function query(sql: string, id = 'A'): Promise<QueryResponse> {
 afterAll(() => manager.close())
 describe('PostgreSQL API (real database)', () => {
   it('reports health and default session names', async () => {
-    expect(await (await app.request('/api/health')).json()).toEqual({ ok: true, database: 'reachable' })
-    const sessions = await (await app.request('/api/sessions')).json() as SessionStatus[]
+    expect(await (await app.request('/api/health', { headers: { Host: host } })).json()).toEqual({ ok: true, database: 'reachable' })
+    const sessions = await (await app.request('/api/sessions', { headers: { Host: host } })).json() as SessionStatus[]
     expect(sessions.map(session => session.id)).toEqual(['admin', 'A', 'B'])
+  })
+  it('allowlists Host headers to block DNS rebinding reads', async () => {
+    const allowed = [`localhost:${config.apiPort}`, `127.0.0.1:5173`, 'localhost:5173']
+    for (const value of allowed) expect((await app.request('/api/health', { headers: { Host: value } })).status).toBe(200)
+    for (const evil of ['evil.example.com', 'localhost:8080', '127.0.0.1:1', 'sub.localhost:3001']) {
+      expect((await app.request('/api/health', { headers: { Host: evil } })).status).toBe(403)
+    }
+    // A browser always sends Host; a request without one is not a browser and is rejected too.
+    expect((await app.request('/api/health')).status).toBe(403)
   })
   it('lazily connects and returns one SELECT with fields and duration', async () => {
     const result = await query('SELECT 42::integer AS answer, NULL::text AS empty')
@@ -75,12 +86,14 @@ describe('PostgreSQL API (real database)', () => {
     expect((await running).error?.code).toBe('57014')
     expect(manager.status('A').busy).toBe(false)
   })
-  it('connects custom sessions and disconnects without silently reconnecting', async () => {
-    expect((await post('/sessions/custom/connect', config.admin)).status).toBe(200)
-    expect((await query('SELECT current_database() AS db', 'custom')).results[0].rows).toEqual([{ db: 'postgres' }])
-    expect((await post('/sessions/custom/disconnect')).status).toBe(200)
-    expect(manager.status('custom').connected).toBe(false)
-    expect((await query('SELECT 1', 'custom')).error?.code).toBe('08003')
+  it('serves only the fixed lesson sessions and rejects unknown ids with 404', async () => {
+    expect((await post('/sessions/custom/connect', config.admin)).status).toBe(404)
+    expect((await post('/sessions/E/query', { sql: 'SELECT 1' })).status).toBe(404)
+    expect((await app.request('/api/sessions/zzz/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: '{}' })).status).toBe(404)
+    expect(manager.list().map(session => session.id)).toEqual(['admin', 'A', 'B'])
+    // A/B/admin keep working after the rejected calls.
+    expect((await query('SELECT current_database() AS db', 'B')).results[0].rows).toEqual([{ db: 'postgres' }])
+    expect((await post('/sessions/B/disconnect')).status).toBe(200)
   })
   it('does not crash when another session terminates a backend', async () => {
     await query('SELECT 1', 'B')
@@ -95,7 +108,7 @@ describe('PostgreSQL API (real database)', () => {
     expect((await post('/sessions/A/query', { sql: ' ' })).status).toBe(400)
     expect((await post('/sessions/A/query', { sql: 123 })).status).toBe(400)
     expect((await post('/sessions/bad!/query', { sql: 'SELECT 1' })).status).toBe(400)
-    expect((await app.request('/api/sessions/A/cancel', { method: 'POST' })).status).toBe(415)
-    expect((await app.request('/api/sessions/A/cancel', { method: 'POST', headers: { Origin: 'https://example.com', 'Content-Type': 'application/json' }, body: '{}' })).status).toBe(403)
+    expect((await app.request('/api/sessions/A/cancel', { method: 'POST', headers: { Host: host } })).status).toBe(415)
+    expect((await app.request('/api/sessions/A/cancel', { method: 'POST', headers: { Origin: 'https://example.com', 'Content-Type': 'application/json', Host: host }, body: '{}' })).status).toBe(403)
   })
 })

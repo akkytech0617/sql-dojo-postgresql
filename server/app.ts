@@ -16,8 +16,15 @@ export function createApp(manager: SessionManager, chapters?: Chapter[]) {
   app.use('/api/*', bodyLimit({ maxSize: 1_100_000, onError: c => c.json({ message: 'リクエストが大きすぎます。' }, 413) }))
   app.use('/api/*', async (c, next) => {
     const origin = c.req.header('Origin')
-    const allowed = [5173, config.apiPort].flatMap(port => [`http://127.0.0.1:${port}`, `http://localhost:${port}`])
+    const ports = [5173, config.apiPort]
+    const allowed = ports.flatMap(port => [`http://127.0.0.1:${port}`, `http://localhost:${port}`])
     if (origin && !allowed.includes(origin)) return c.json({ message: 'このオリジンからの操作は許可されていません。' }, 403)
+    // DNS rebinding guard: a rebound hostname resolves here with the attacker's Host header.
+    // Browsers always send Host, and the Vite dev proxy keeps the browser's Host (changeOrigin is
+    // off), so exactly these local hosts are allowed and anything else is rejected.
+    const host = c.req.header('Host')
+    const allowedHosts = ports.flatMap(port => [`127.0.0.1:${port}`, `localhost:${port}`])
+    if (!host || !allowedHosts.includes(host.toLowerCase())) return c.json({ message: 'このホストからのリクエストは許可されていません。' }, 403)
     if (c.req.method === 'POST' && !c.req.header('Content-Type')?.startsWith('application/json')) {
       return c.json({ message: 'JSON 形式で送信してください。' }, 415)
     }

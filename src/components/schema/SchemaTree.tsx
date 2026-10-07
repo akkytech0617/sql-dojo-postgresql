@@ -46,7 +46,7 @@ export function SchemaTree({ tables }: { tables: SchemaTable[] }) {
   if (!tables.length) return <p className="schema-status">このスキーマには表やビューがありません。</p>
   return <div className="schema-tree">{tables.map(table => <details key={`${table.schema}.${table.name}`} className="schema-table" open={tables.length <= 3}>
     <summary><span className="schema-badge kind">{kindLabel[table.kind]}</span><span className="table-name">{table.name}</span>
-      <span className="schema-meta">{table.rowCount === null ? '' : `${table.rowCount} 行`}</span></summary>
+      <span className="schema-meta">{table.rowCount === null ? '' : `${table.rowCountEstimated ? '約' : ''}${table.rowCount} 行`}</span></summary>
     <TableDetails table={table} />
   </details>)}</div>
 }

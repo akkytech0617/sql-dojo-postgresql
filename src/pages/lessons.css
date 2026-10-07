@@ -32,6 +32,10 @@
 .lesson-help summary { cursor: pointer; color: #c0c8d3; }
 .lesson-toast { margin: 16px 0; }
 .lesson-toast.passed { border-color: #5b8974; color: #a3ddc1; }
+.lesson-entry-state { grid-column: 1 / -1; }
+.lesson-entry-state .feedback { margin: 0 0 8px; }
+.lesson-entry-rollback { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.lesson-entry-rollback .feedback { flex: 1 1 320px; margin: 0; }
 .lesson-editors { display: grid; gap: 24px; min-width: 0; }
 .lesson-session { min-width: 0; }
 .lesson-session .session-row { padding: 12px; gap: 12px; }

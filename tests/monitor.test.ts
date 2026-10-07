@@ -7,9 +7,10 @@ import type { QueryResponse } from '../src/shared/types.js'
 
 const manager = new SessionManager()
 const app = createApp(manager)
+const host = `127.0.0.1:${config.apiPort}`
 
 function post(path: string, body: unknown) {
-  return app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  return app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify(body) })
 }
 async function query(id: string, sql: string): Promise<QueryResponse> {
   const response = await post(`/sessions/${id}/query`, { sql })
@@ -17,7 +18,7 @@ async function query(id: string, sql: string): Promise<QueryResponse> {
   return await response.json() as QueryResponse
 }
 async function monitor(): Promise<MonitorResponse> {
-  const response = await app.request('/api/monitor')
+  const response = await app.request('/api/monitor', { headers: { Host: host } })
   expect(response.status).toBe(200)
   return await response.json() as MonitorResponse
 }

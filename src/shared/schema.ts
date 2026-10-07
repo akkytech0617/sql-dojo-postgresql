@@ -33,6 +33,8 @@ export interface SchemaTable {
   kind: TableKind
   comment: string | null
   rowCount: number | null
+  /** True when rowCount is the planner's estimate (pg_class.reltuples) because an exact count hit a lock timeout. */
+  rowCountEstimated?: boolean
   primaryKey: string[]
   columns: SchemaColumn[]
   foreignKeys: SchemaForeignKey[]

@@ -26,12 +26,10 @@ export class SessionManager {
   private newSession(id: string, lazy = false): Session {
     return { id, client: null, info: null, pid: null, tx: 'unknown', busy: false, lazy }
   }
+  /** Sessions are a fixed set (admin/A/B); unknown ids are a client error, not a new session. */
   private get(id: string): Session {
-    let session = this.sessions.get(id)
-    if (!session) {
-      session = this.newSession(id)
-      this.sessions.set(id, session)
-    }
+    const session = this.sessions.get(id)
+    if (!session) throw sessionError('42704', `セッション ${id} は存在しません。admin / A / B のいずれかを指定してください。`)
     return session
   }
   private clear(session: Session) {

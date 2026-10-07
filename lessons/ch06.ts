@@ -9,7 +9,7 @@ const chapter: Chapter = {
       task: '蔵書 copy_id = 61 の status を repair に更新してください。RETURNING で copy_id と status を表示して、変更結果をその場で確認します。',
       hints: ['UPDATE public.copies SET status = \'repair\' WHERE ... の形です。', 'WHERE copy_id = 61 を忘れると80行全部が変わります。', 'RETURNING copy_id, status; を末尾に付けます。'],
       solution: `UPDATE public.copies SET status = 'repair' WHERE copy_id = 61 RETURNING copy_id, status;`,
-      check: { type: 'result-equals', ordered: true, expectedSql: `SELECT copy_id, status FROM public.copies WHERE copy_id = 61` },
+      check: { type: 'sql', sql: `SELECT (SELECT count(*) FROM public.copies WHERE copy_id = 61 AND status = 'repair') = 1` },
       mysqlNote: 'MySQL の UPDATE 構文は同じですが、**RETURNING がありません**。更新前に SELECT で確認してから UPDATE、更新後に SELECT で再確認、が MySQL での定石です（だからこそ SELECT-first の指針は両方の文化で通用します）。MySQL Workbench は既定で sql_safe_updates（WHERE にキー列がない UPDATE/DELETE を拒否）が有効で、WHERE 忘れを機械的に防いでくれる設定例として知られています。' },
     { id: 'ch06-02', title: 'UPDATE ... FROM — 別の表を条件に一括更新', session: 'A',
       story: '技術書の書架で一斉点検が決まりました。技術書（category_id = 4）の蔵書のうち、現在利用可能なものを、まとめて点検扱い（repair）にします。「対象の本」は books 表を見ないと決められません。',

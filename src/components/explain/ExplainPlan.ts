@@ -1,4 +1,4 @@
-import type { QueryResult } from '../../shared/types'
+import type { QueryResponse, QueryResult } from '../../shared/types.js'
 
 /** Node of EXPLAIN (FORMAT JSON) output. Keys match PostgreSQL's JSON plan field names. */
 export interface ExplainNode {
@@ -193,6 +193,23 @@ export function hasExtraStatements(text: string): boolean {
 /** Read-only statements execute safely under EXPLAIN ANALYZE; anything else may modify rows. */
 export function isReadOnlyStatement(statement: string): boolean {
   return /^(SELECT|VALUES|TABLE)\b/i.test(statement)
+}
+
+/** SQL sent to the session: a plain EXPLAIN, or the ANALYZE-of-DML batch wrapped in BEGIN/ROLLBACK. */
+export function explainRequest(statement: string, options: string, wrapInTransaction: boolean): string {
+  return wrapInTransaction
+    ? `BEGIN; EXPLAIN (${options}) ${statement}; ROLLBACK;`
+    : `EXPLAIN (${options}) ${statement}`
+}
+
+/**
+ * A wrapped batch that fails mid-way leaves the session inside an aborted transaction: when an
+ * earlier statement of a multi-statement batch errors, the trailing ROLLBACK never runs. The
+ * caller must send a cleanup ROLLBACK (still surfacing the original error) or the session stays
+ * "idle in transaction (aborted)" and rejects every further statement with 25P02.
+ */
+export function needsCleanupRollback(wrapped: boolean, response: QueryResponse): boolean {
+  return wrapped && !!response.error
 }
 
 /**

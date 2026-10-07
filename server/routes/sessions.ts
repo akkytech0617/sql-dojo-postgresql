@@ -6,10 +6,14 @@ import { expandLessonSql } from '../lesson-sql.js'
 const connectionSchema = z.object({ user: z.string().min(1).max(128), password: z.string().max(1024), database: z.string().min(1).max(128) })
 const querySchema = z.object({ sql: z.string().trim().min(1).max(1_000_000) })
 const idSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/)
+/** The API only ever serves the fixed lesson sessions; anything else is unknown, not new. */
+const sessionIds = new Set(['admin', 'A', 'B'])
 export function sessionRoutes(manager: SessionManager) {
   const routes = new Hono()
   routes.use('/:id/*', async (c, next) => {
-    if (!idSchema.safeParse(c.req.param('id')).success) return c.json({ message: 'セッション ID が不正です。' }, 400)
+    const id = c.req.param('id')
+    if (!idSchema.safeParse(id).success) return c.json({ message: 'セッション ID が不正です。' }, 400)
+    if (!sessionIds.has(id)) return c.json({ message: 'セッションが見つかりません。admin / A / B のいずれかを指定してください。' }, 404)
     await next()
   })
   routes.get('/', c => c.json(manager.list()))

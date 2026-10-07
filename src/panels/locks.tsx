@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import '../components/locks/locks.css'
 import type { PanelDefinition } from '../app/panelRegistry'
+import { api } from '../api/client'
 import { BackendTable } from '../components/locks/BackendTable'
 import { LockWaitList } from '../components/locks/LockWaitList'
 import type { MonitorResponse } from '../shared/monitor'
-
-async function fetchMonitor(): Promise<MonitorResponse> {
-  let response: Response
-  try { response = await fetch('/api/monitor') }
-  catch { throw new Error('ロック情報の取得に失敗しました。API サーバーを確認してください。') }
-  const data: unknown = await response.json()
-  if (!response.ok) throw new Error((data as { message?: string }).message ?? 'ロック情報の取得に失敗しました。')
-  return data as MonitorResponse
-}
 
 function LocksPanel() {
   const [data, setData] = useState<MonitorResponse | null>(null)
@@ -20,16 +12,27 @@ function LocksPanel() {
 
   const load = useCallback(async () => {
     try {
-      const next = await fetchMonitor()
-      setData(next)
+      setData(await api.monitor())
       setError('')
     } catch (cause) { setError(String(cause instanceof Error ? cause.message : cause)) }
   }, [])
 
   useEffect(() => {
-    void load()
-    const timer = setInterval(() => { void load() }, 1000)
-    return () => clearInterval(timer)
+    let active = true
+    let inFlight = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    // Chained timeout with an in-flight guard: one refresh at a time, next scheduled only after
+    // the previous settles, and a fast unmount leaves no pending fetch behind.
+    const tick = () => {
+      if (!active || inFlight) return
+      inFlight = true
+      void load().finally(() => {
+        inFlight = false
+        if (active) timer = setTimeout(tick, 1000)
+      })
+    }
+    tick()
+    return () => { active = false; clearTimeout(timer) }
   }, [load])
 
   if (error) return <div className="lock-tools"><p className="feedback" role="status">{error}</p></div>

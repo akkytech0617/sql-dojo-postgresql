@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { createApp } from '../server/app.js'
+import { config } from '../server/config.js'
 import { withAdmin } from '../server/lessons.js'
 import { SessionManager } from '../server/sessions.js'
 import type { Chapter, ResetResponse } from '../src/shared/lessons.js'
@@ -22,7 +23,7 @@ describe.skipIf(!enabled)('bootstrap-ch07-09.sql self-test', () => {
   const app = createApp(manager, withBootstrap(base, 4, sql))
   afterAll(() => manager.close())
   async function post<T>(path: string, body: unknown): Promise<T> {
-    const response = await app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const response = await app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Host: `127.0.0.1:${config.apiPort}` }, body: JSON.stringify(body) })
     const data: unknown = await response.json()
     expect(response.status, JSON.stringify(data)).toBe(200)
     return data as T

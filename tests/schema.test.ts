@@ -1,21 +1,34 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { createApp } from '../server/app.js'
+import { config } from '../server/config.js'
+import { withAdmin } from '../server/lessons.js'
 import { chapters } from '../lessons/index.js'
 import { SessionManager } from '../server/sessions.js'
 import { buildErDiagram, mermaidType } from '../src/components/schema/erBuilder.js'
 import type { ResetResponse } from '../src/shared/lessons.js'
 import type { SchemaInfo, SchemaTable } from '../src/shared/schema.js'
+import type { QueryResponse } from '../src/shared/types.js'
 const manager = new SessionManager()
 const app = createApp(manager, chapters)
+const host = `127.0.0.1:${config.apiPort}`
 afterAll(() => manager.close())
 /** reset(4) replays ch0..3: the end-of-chapter-3 state (canonical seed, aligned sequences). */
 async function reset(toChapter = 4): Promise<ResetResponse> {
-  const response = await app.request('/api/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toChapter }) })
+  const response = await app.request('/api/reset', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify({ toChapter }) })
   expect(response.status).toBe(200)
   return await response.json() as ResetResponse
 }
 async function getSchema(database?: string): Promise<Response> {
-  return app.request(`/api/schema${database === undefined ? '' : `?database=${encodeURIComponent(database)}`}`)
+  return app.request(`/api/schema${database === undefined ? '' : `?database=${encodeURIComponent(database)}`}`, { headers: { Host: host } })
+}
+async function connectA(database = 'library') {
+  const response = await app.request('/api/sessions/A/connect', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify({ ...config.admin, database }) })
+  expect(response.status).toBe(200)
+}
+async function query(sql: string): Promise<QueryResponse> {
+  const response = await app.request('/api/sessions/A/query', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify({ sql }) })
+  expect(response.status).toBe(200)
+  return await response.json() as QueryResponse
 }
 describe('schema browser API (real PostgreSQL)', () => {
   it('validates the database name', async () => {
@@ -103,5 +116,51 @@ describe('schema browser API (real PostgreSQL)', () => {
     expect(mermaidType('character varying(13)')).toBe('varchar')
     expect(mermaidType('timestamp with time zone')).toBe('timestamptz')
     expect(mermaidType('numeric(10,2)')).toBe('numeric')
+  })
+  it('orders composite keys by key position and keeps quoted identifiers whole', async () => {
+    await connectA()
+    const created = await query(`CREATE TABLE public.schema_probe ("comma, space" integer, z integer, a integer, CONSTRAINT schema_probe_pkey PRIMARY KEY (z, "comma, space"));
+CREATE TABLE public.schema_probe_child (id integer CONSTRAINT schema_probe_child_pkey PRIMARY KEY, ref1 integer, ref2 integer, CONSTRAINT schema_probe_child_fkey FOREIGN KEY (ref2, ref1) REFERENCES public.schema_probe (z, "comma, space") ON DELETE CASCADE);`)
+    expect(created.error, JSON.stringify(created.error)).toBeUndefined()
+    try {
+      const info = await (await getSchema('library')).json() as SchemaInfo
+      const probe = info.tables.find(table => table.schema === 'public' && table.name === 'schema_probe')!
+      const child = info.tables.find(table => table.schema === 'public' && table.name === 'schema_probe_child')!
+      // Key order (indkey), not column definition order ("comma, space" comes first).
+      expect(probe.primaryKey).toEqual(['z', 'comma, space'])
+      // Column lists are arrays, so an identifier containing ", " stays one element.
+      expect(child.foreignKeys.find(foreignKey => foreignKey.name === 'schema_probe_child_fkey')).toMatchObject({
+        columnNames: ['ref2', 'ref1'], referencesSchema: 'public', referencesTable: 'schema_probe',
+        referencesColumnNames: ['z', 'comma, space'], onDelete: 'CASCADE',
+      })
+    } finally {
+      await query('DROP TABLE public.schema_probe_child; DROP TABLE public.schema_probe;')
+    }
+  })
+  it('still answers quickly while another session holds an ACCESS EXCLUSIVE lock', async () => {
+    await reset()
+    await connectA()
+    // ch02-09's experiment shape: DDL inside an open transaction keeps the lock until ROLLBACK.
+    expect((await query('BEGIN; ALTER TABLE public.categories ADD COLUMN lock_probe integer;')).error).toBeUndefined()
+    const expectedFallback = await withAdmin('library', async client => {
+      const result = await client.query<{ reltuples: number }>("SELECT c.reltuples::bigint AS reltuples FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relname = 'categories'")
+      return result.rows[0].reltuples < 0 ? null : Number(result.rows[0].reltuples)
+    })
+    const startedAt = Date.now()
+    const response = await getSchema('library')
+    const seconds = (Date.now() - startedAt) / 1000
+    expect(response.status).toBe(200)
+    // lock_timeout (500ms) bounds the blocked count instead of waiting for the ALTER to finish.
+    expect(seconds).toBeLessThan(10)
+    const info = await response.json() as SchemaInfo
+    const categories = info.tables.find(table => table.schema === 'public' && table.name === 'categories')!
+    expect(categories.rowCount).toBe(expectedFallback)
+    expect(categories.rowCountEstimated).toBe(expectedFallback !== null)
+    // The other relations are unaffected: exact counts, no estimate flag.
+    const books = info.tables.find(table => table.schema === 'public' && table.name === 'books')!
+    expect(books.rowCount).toBe(50)
+    expect(books.rowCountEstimated ?? false).toBe(false)
+    expect((await query('ROLLBACK')).error).toBeUndefined()
+    expect(manager.status('A').transactionStatus).toBe('idle')
   })
 })

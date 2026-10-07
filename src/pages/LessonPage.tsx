@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './lessons.css'
@@ -18,7 +18,7 @@ function savedProgress(): string[] {
 function Md({ text }: { text: string }) { return <div className="lesson-markdown"><Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown></div> }
 const emptyResponse = (): QueryResponse => ({ results: [], notices: [] })
 function Workspace({ step, onPassed, onBusy }: { step: Step; onPassed: () => void; onBusy: (busy: boolean) => void }) {
-  const ids: SessionId[] = step.session === 'AB' ? ['A', 'B'] : [step.session]
+  const ids: SessionId[] = useMemo(() => step.session === 'AB' ? ['A', 'B'] : [step.session], [step.session])
   const [sql, setSql] = useState<Record<SessionId, string>>({ A: '', B: '' })
   const [responses, setResponses] = useState<Record<SessionId, QueryResponse>>({ A: emptyResponse(), B: emptyResponse() })
   const [statuses, setStatuses] = useState<SessionStatus[]>([])
@@ -30,37 +30,102 @@ function Workspace({ step, onPassed, onBusy }: { step: Step; onPassed: () => voi
   const [message, setMessage] = useState('')
   const [grading, setGrading] = useState(false)
   const [passed, setPassed] = useState(false)
-  const refresh = useCallback(async () => setStatuses(await api.sessions()), [])
+  const [entryOpen, setEntryOpen] = useState<SessionId[]>([])
+  const [entryResetNote, setEntryResetNote] = useState('')
+  const enteredRef = useRef(false)
+  const refresh = useCallback(async (): Promise<SessionStatus[]> => {
+    const value = await api.sessions()
+    setStatuses(value)
+    return value
+  }, [])
   useEffect(() => {
     let active = true
     const poll = () => { void api.sessions().then(value => { if (active) setStatuses(value) }).catch(error => { if (active) setMessage(String(error)) }) }
     poll(); const timer = setInterval(poll, 1000)
     return () => { active = false; clearInterval(timer) }
   }, [])
-  function mark(index: number, value: boolean) {
+  useEffect(() => {
+    if (enteredRef.current) return
+    enteredRef.current = true
+    void (async () => {
+      if (step.session === 'AB' && step.script) {
+        // Guided two-session experiments need known-clean sessions: an open transaction or a
+        // left-over SET (lock_timeout, deadlock_timeout) from an earlier step would change the
+        // outcome. Reset both — but never send anything to a session that is still running.
+        const before = await api.sessions().catch(() => [] as SessionStatus[])
+        const reset: SessionId[] = []
+        for (const id of ids) {
+          const status = before.find(item => item.id === id)
+          if (!status?.connected || status.busy) continue
+          const response = await api.query(id, 'ROLLBACK; RESET ALL;').catch(() => null)
+          if (response && !response.error) reset.push(id)
+        }
+        if (reset.length) setEntryResetNote(`このステップに入る際、セッション ${reset.join('・')} に ROLLBACK; RESET ALL; を自動実行しました（前のステップで開いたままのトランザクションと SET した設定を、このステップの実験の前に戻すため）。`)
+      }
+      const statuses = await refresh().catch(() => [] as SessionStatus[])
+      // Snapshot once on entry only: opening a transaction mid-step is often the lesson itself.
+      setEntryOpen(ids.filter(id => {
+        const status = statuses.find(item => item.id === id)
+        return !!status?.connected && (status.transactionStatus === 'transaction' || status.transactionStatus === 'failed')
+      }))
+    })()
+  }, [step, ids, refresh])
+  const mark = useCallback((index: number, value: boolean) => {
     const next = [...completedRef.current]; next[index] = value
     completedRef.current = next; setCompleted(next)
-  }
-  function setRunning(id: SessionId, value: boolean) {
+  }, [])
+  const setRunning = useCallback((id: SessionId, value: boolean) => {
     busyRef.current[id] = value; setBusy({ ...busyRef.current }); onBusy(busyRef.current.A || busyRef.current.B)
-  }
+  }, [onBusy])
   async function connection(id: SessionId, info: ConnectionInfo) {
     setRunning(id, true); setPassed(false)
     try { await api.connect(id, info); await refresh(); setMessage('接続しました。') }
     catch (error) { setMessage(String(error)) } finally { setRunning(id, false) }
   }
-  async function run(id: SessionId, text: string, csv = false) {
+  async function rollbackEntry() {
+    const current = await api.sessions().catch(() => [] as SessionStatus[])
+    const done: SessionId[] = []
+    for (const id of entryOpen) {
+      const status = current.find(item => item.id === id)
+      if (!status?.connected || status.busy) continue
+      setRunning(id, true)
+      const response = await api.query(id, 'ROLLBACK').catch(() => null)
+      setRunning(id, false)
+      if (response && !response.error) done.push(id)
+    }
+    setEntryOpen(value => value.filter(id => !done.includes(id)))
+    if (done.length) setMessage(`セッション ${done.join('・')} を ROLLBACK して、状態を戻しました。`)
+    await refresh().catch(error => setMessage(String(error)))
+  }
+  const run = useCallback(async (id: SessionId, text: string, csv = false) => {
     if (busyRef.current[id] || !text.trim()) return
     setRunning(id, true); setMessage(''); setPassed(false)
     const index = completedRef.current.findIndex(done => !done)
     const action = step.script?.[index]
     const matches = !csv && action?.session === id && action.sql.trim() === text.trim()
     let settled = false, observedBlock = false
+    // Backstop for when the lock monitor is slow or unreachable: a matched guide query that is
+    // still running after 1s reads as blocked (the previous heuristic), never double-marking.
     const timer = setTimeout(() => {
-      if (matches && action?.expect === 'blocks' && !settled) {
+      if (matches && action?.expect === 'blocks' && !settled && !observedBlock) {
         observedBlock = true; mark(index, true); setMessage('ロック待ちを確認しました。次のセッションの操作へ進んでください。')
       }
     }, 1000)
+    if (matches && action?.expect === 'blocks') {
+      void (async () => {
+        // Primary detection: ask the server's lock view whether this session is waiting on a lock.
+        while (!settled && !observedBlock) {
+          try {
+            const monitor = await api.monitor()
+            if (monitor.lockWaits.some(wait => wait.blockedSessionId === id)) {
+              observedBlock = true; mark(index, true); setMessage('ロック待ちを確認しました（pg_locks の待ちを検出）。次のセッションの操作へ進んでください。')
+              return
+            }
+          } catch { return } // monitor failed → the 1s timer fallback decides
+          await new Promise(resolve => setTimeout(resolve, 250))
+        }
+      })()
+    }
     try {
       const response = csv ? await api.csv('authors.csv', id) : await api.query(id, text)
       settled = true; setResponses(value => ({ ...value, [id]: response }))
@@ -72,7 +137,7 @@ function Workspace({ step, onPassed, onBusy }: { step: Step; onPassed: () => voi
       }
     } catch (error) { settled = true; if (matches) mark(index, false); setMessage(String(error)) }
     finally { clearTimeout(timer); setRunning(id, false); await refresh().catch(error => setMessage(String(error))) }
-  }
+  }, [step, mark, setRunning, refresh])
   async function grade() {
     setGrading(true)
     try {
@@ -83,7 +148,15 @@ function Workspace({ step, onPassed, onBusy }: { step: Step; onPassed: () => voi
     } catch (error) { setMessage(String(error)) } finally { setGrading(false) }
   }
   const anyBusy = busy.A || busy.B
-  return <div className="lesson-workspace"><article className="lesson-reading">
+  return <div className="lesson-workspace">
+    {(entryResetNote || entryOpen.length > 0) && <div className="lesson-entry-state" role="status">
+      {entryResetNote && <p className="feedback lesson-toast">{entryResetNote}</p>}
+      {entryOpen.length > 0 && <div className="lesson-entry-rollback">
+        <p className="feedback lesson-toast">前のステップのトランザクションが、セッション {entryOpen.join('・')} で開いたままです。このままだとロックや SET した設定がこのステップに影響します。</p>
+        <button onClick={() => { void rollbackEntry() }}>ROLLBACK して状態を戻す</button>
+      </div>}
+    </div>}
+    <article className="lesson-reading">
     <p className="eyebrow">{step.id} / 市立図書館の業務から学ぶ</p><h1>{step.title}</h1>
     {step.story && <div className="lesson-story"><Md text={step.story} /></div>}
     <Md text={step.explanation} />

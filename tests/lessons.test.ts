@@ -14,7 +14,7 @@ function harness(content: Chapter[]) {
   const manager = new SessionManager(); managers.push(manager)
   const app = createApp(manager, content)
   async function post<T>(path: string, body: unknown): Promise<T> {
-    const response = await app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const response = await app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Host: `127.0.0.1:${config.apiPort}` }, body: JSON.stringify(body) })
     const result: unknown = await response.json()
     expect(response.status, JSON.stringify(result)).toBe(200)
     return result as T
@@ -139,8 +139,8 @@ describe('lesson engine fixture and regression checks', () => {
     const actual = await fingerprint()
     await h.reset(2)
     expect(await fingerprint()).toEqual(actual)
-    expect((await h.app.request('/api/lessons')).status).toBe(200)
-    expect((await h.app.request('/api/lessons')).headers.get('content-type')).toContain('application/json')
+    expect((await h.app.request('/api/lessons', { headers: { Host: `127.0.0.1:${config.apiPort}` } })).status).toBe(200)
+    expect((await h.app.request('/api/lessons', { headers: { Host: `127.0.0.1:${config.apiPort}` } })).headers.get('content-type')).toContain('application/json')
   })
   it('checks errors and ordered two-session lock scripts', async () => {
     const errorStep: Step = { id: 'ch02-01', title: 'error', session: 'A', explanation: '', task: '', hints: [], solution: "INSERT INTO public.demo VALUES(1,'duplicate')", replay: '', check: { type: 'error-code', code: '23505' } }
@@ -175,7 +175,7 @@ describe('lesson engine fixture and regression checks', () => {
     const user = 'lib_engine_test'
     expect((await h.query('A', `CREATE ROLE ${user} LOGIN PASSWORD 'lib_engine_test_pw'; GRANT CONNECT ON DATABASE library TO ${user};`)).error).toBeUndefined()
     expect((await h.query('admin', `CREATE TABLE public.lib_engine_owned(value integer); ALTER TABLE public.lib_engine_owned OWNER TO ${user}`)).error).toBeUndefined()
-    const bad = await h.app.request('/api/sessions/B/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user, password: 'wrong', database: 'library' }) })
+    const bad = await h.app.request('/api/sessions/B/connect', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: `127.0.0.1:${config.apiPort}` }, body: JSON.stringify({ user, password: 'wrong', database: 'library' }) })
     expect(((await bad.json()) as { error: { code: string } }).error.code).toBe('28P01')
     await h.post('/sessions/B/connect', { user, password: 'lib_engine_test_pw', database: 'library' })
     expect((await h.query('B', 'SELECT current_user')).results[0].rows[0]).toEqual({ current_user: user })
@@ -186,7 +186,7 @@ describe('lesson engine fixture and regression checks', () => {
     await h.query('admin', 'DROP TABLE public.lib_engine_owned')
   })
   it('rejects malformed input and unsafe asset paths', async () => {
-    const bad = (path: string, body: unknown) => h.app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const bad = (path: string, body: unknown) => h.app.request(`/api${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Host: `127.0.0.1:${config.apiPort}` }, body: JSON.stringify(body) })
     expect((await bad('/lessons/check', { stepId: 'nope' })).status).toBe(400)
     expect((await bad('/lessons/check', { stepId: 'ch99-99' })).status).toBe(400)
     expect((await bad('/reset', { toChapter: 14 })).status).toBe(400)

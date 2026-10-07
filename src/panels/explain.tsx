@@ -3,7 +3,7 @@ import '../components/explain/explain.css'
 import { api } from '../api/client'
 import { ErrorPanel } from '../components/ErrorPanel'
 import { PlanTree } from '../components/explain/PlanTree'
-import { firstStatement, hasExtraStatements, isReadOnlyStatement, parseExplainResult, prefillFromSolution } from '../components/explain/ExplainPlan'
+import { firstStatement, hasExtraStatements, explainRequest, isReadOnlyStatement, needsCleanupRollback, parseExplainResult, prefillFromSolution } from '../components/explain/ExplainPlan'
 import type { PanelDefinition, PanelProps } from '../app/panelRegistry'
 import type { ExplainDocument } from '../components/explain/ExplainPlan'
 import type { SessionId } from '../shared/lessons'
@@ -40,25 +40,32 @@ function ExplainPanel({ step }: PanelProps) {
   async function run() {
     if (!statement.trim() || running) return
     setRunning(true); setMessage(''); setPlan(null); setResponse(null)
+    const wrap = !readOnly && analyze
     try {
       let toSend: string
-      if (readOnly || !analyze) {
-        toSend = `EXPLAIN (${options}) ${statement}`
+      if (!wrap) {
+        toSend = explainRequest(statement, options, false)
       } else {
         if (status && status.transactionStatus !== 'idle' && status.transactionStatus !== 'unknown') {
           setMessage(`セッション ${session} は${txLabels[status.transactionStatus] ?? status.transactionStatus}です。更新系の EXPLAIN ANALYZE は BEGIN/ROLLBACK で包むため、開いたトランザクションがある間は実行できません。先に COMMIT / ROLLBACK してください。`)
           return
         }
-        toSend = `BEGIN; EXPLAIN (${options}) ${statement}; ROLLBACK;`
+        toSend = explainRequest(statement, options, true)
       }
       const result = await api.query(session, toSend)
       setSent(toSend)
       setResponse(result)
-      const explained = result.results.find(item => item.fields.some(field => field.name === 'QUERY PLAN'))
-      const document = explained ? parseExplainResult(explained) : null
-      setPlan(document)
-      if (result.error) { /* ErrorPanel below shows the failure */ }
-      else if (!document) setMessage('実行計画を取得できませんでした。SELECT 文に対して使うのが基本です。')
+      if (needsCleanupRollback(wrap, result)) {
+        // The failed statement aborted the wrapping transaction and the batch's trailing ROLLBACK
+        // never ran; close the aborted transaction so the session is usable again.
+        const cleanup = await api.query(session, 'ROLLBACK').catch(() => null)
+        if (!cleanup?.error) setMessage('SQL が失敗したため、EXPLAIN ANALYZE を包んでいたトランザクションを ROLLBACK で閉じました。下のエラーが元の失敗です。')
+      } else if (!result.error) {
+        const explained = result.results.find(item => item.fields.some(field => field.name === 'QUERY PLAN'))
+        const document = explained ? parseExplainResult(explained) : null
+        setPlan(document)
+        if (!document) setMessage('実行計画を取得できませんでした。SELECT 文に対して使うのが基本です。')
+      }
     } catch (error) { setMessage(String(error instanceof Error ? error.message : error)) }
     finally { setRunning(false) }
   }
