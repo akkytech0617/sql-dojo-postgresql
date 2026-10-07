@@ -1,0 +1,38 @@
+.explain-tools { display: grid; gap: 12px; padding: 16px 20px 20px; }
+.explain-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+.explain-toolbar .session-toggle { display: inline-flex; }
+.explain-toolbar .session-toggle button { min-height: 36px; padding: 6px 14px; border-radius: 6px 0 0 6px; border-right-width: 0; }
+.explain-toolbar .session-toggle button + button { border-radius: 0 6px 6px 0; border-right-width: 1px; }
+.explain-toolbar .session-toggle button[aria-pressed="true"] { background: #a3ddc1; color: #16342a; border-color: #a3ddc1; font-weight: 650; }
+.explain-options { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #bbc3ce; }
+.explain-options label { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; }
+.explain-options input { accent-color: #a3ddc1; }
+.explain-editor { width: 100%; border: 1px solid #414b59; background: #171b22; color: #e5e8ed; border-radius: 8px; padding: 12px 14px; font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; min-height: 96px; resize: vertical; }
+.explain-editor:focus-visible { outline: 2px solid #91d3b9; outline-offset: 1px; }
+.explain-run { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.explain-sent { font-size: 12px; color: #a9b1bf; overflow-wrap: anywhere; }
+.explain-sent code { color: #a3ddc1; }
+.explain-warn { font-size: 12px; color: #ffcf8e; }
+.explain-summary { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: #a9b1bf; padding: 8px 0 0; }
+.explain-summary strong { color: #a3ddc1; font-weight: 650; }
+.plan-tree, .plan-children { list-style: none; margin: 0; padding: 0; }
+.plan-children { margin-left: 4px; padding-left: 16px; border-left: 1px solid #3b424e; }
+.plan-branch { margin: 4px 0; }
+.plan-node { border: 1px solid #303743; background: #15191f; border-radius: 6px; padding: 8px 12px; }
+.plan-node-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.plan-node-head strong { color: #e5e8ed; }
+.plan-node-head code { font-size: 12px; color: #a9b1bf; }
+.plan-node-head .plan-index { color: #a3ddc1; }
+.plan-gloss { font-size: 11px; color: #a3ddc1; border: 1px solid #343e39; background: #1c2823; border-radius: 4px; padding: 1px 6px; }
+.plan-node-metrics { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 6px; font-size: 12px; }
+.plan-metric { color: #bbc3ce; font-family: monospace; }
+.plan-metric-warn { color: #ffcf8e; }
+.plan-estimate { color: #a9b1bf; }
+.plan-estimate-bad { color: #ffb3b3; font-weight: 650; }
+.plan-time { display: inline-flex; align-items: center; gap: 8px; min-width: 160px; flex: 1; max-width: 280px; }
+.plan-time-label { color: #a3ddc1; font-family: monospace; white-space: nowrap; }
+.plan-time-bar { flex: 1; height: 6px; background: #232a34; border-radius: 3px; overflow: hidden; display: inline-block; }
+.plan-time-fill { display: block; height: 100%; background: linear-gradient(90deg, #5b8974, #a3ddc1); border-radius: 3px; }
+.plan-detail { font-size: 12px; color: #a9b1bf; margin-top: 4px; }
+.plan-detail-emphasis { color: #c0c8d3; }
+.explain-hint { font-size: 12px; color: #a9b1bf; }

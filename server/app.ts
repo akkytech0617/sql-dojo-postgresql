@@ -7,6 +7,7 @@ import { sessionRoutes } from './routes/sessions.js'
 import type { SessionManager } from './sessions.js'
 import { LessonEngine } from './lessons.js'
 import { lessonRoutes } from './routes/lessons.js'
+import { monitorRoutes } from './routes/monitor.js'
 import type { Chapter } from '../src/shared/lessons.js'
 export function createApp(manager: SessionManager, chapters?: Chapter[]) {
   const engine = new LessonEngine(manager, chapters)
@@ -28,6 +29,7 @@ export function createApp(manager: SessionManager, chapters?: Chapter[]) {
   app.route('/api/health', healthRoutes(manager))
   app.route('/api/sessions', sessionRoutes(manager))
   app.route('/api/lessons', lessonRoutes(engine, manager))
+  app.route('/api/monitor', monitorRoutes(manager))
   app.post('/api/reset', async c => {
     const body: unknown = await c.req.json().catch(() => null)
     if (!body || typeof body !== 'object' || Array.isArray(body)) return c.json({ message: 'リセット指定が不正です。' }, 400)

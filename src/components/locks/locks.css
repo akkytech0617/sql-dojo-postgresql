@@ -1,0 +1,26 @@
+.lock-tools { display: grid; gap: 16px; padding: 16px 20px 20px; }
+.lock-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 12px; color: #a9b1bf; flex-wrap: wrap; }
+.lock-live { display: inline-flex; align-items: center; gap: 8px; color: #a3ddc1; }
+.lock-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #a3ddc1; animation: lock-pulse 1.6s ease-in-out infinite; }
+@keyframes lock-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.lock-empty { text-align: center; padding: 20px 12px; border: 1px dashed #39414e; border-radius: 8px; color: #a9b1bf; font-size: 13px; }
+.lock-wait-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.lock-wait-item { border: 1px solid #6b4249; background: #2b2025; border-radius: 8px; padding: 14px 16px; display: grid; gap: 10px; }
+.lock-wait-flow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+.lock-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #3b424e; background: #242a34; border-radius: 6px; padding: 4px 10px; font-family: monospace; font-weight: bold; }
+.lock-chip.lock-chip-blocked { border-color: #b37f8a; background: #3a2730; color: #ffb3b3; }
+.lock-chip.lock-chip-holding { border-color: #5b8974; background: #29392f; color: #a3ddc1; }
+.lock-arrow { display: inline-flex; align-items: center; gap: 6px; color: #ffb3b3; font-weight: 650; white-space: nowrap; }
+.lock-arrow::before { content: '⟶'; font-size: 20px; line-height: 1; }
+.lock-wait-detail { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: #ead0d4; }
+.lock-tag { border: 1px solid #504360; background: #211a26; border-radius: 4px; padding: 2px 8px; font-family: monospace; }
+.lock-backend-table { width: 100%; }
+.lock-backend-table th { text-align: left; }
+.lock-backend-table td { max-width: 420px; font-size: 12px; padding: 8px 12px; }
+.lock-state { white-space: nowrap; }
+.lock-state-idle-in-transaction { color: #ffcf8e; font-weight: 650; }
+.lock-state-active-lock { color: #ffb3b3; font-weight: 650; }
+.lock-tr-idle-in-transaction td { background: #332718; }
+.lock-query { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.lock-muted { color: #a9b1bf; }
+.lock-highlight-note { color: #ffcf8e; }
