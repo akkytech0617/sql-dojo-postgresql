@@ -22,7 +22,7 @@ async function getSchema(database?: string): Promise<Response> {
   return app.request(`/api/schema${database === undefined ? '' : `?database=${encodeURIComponent(database)}`}`, { headers: { Host: host } })
 }
 async function connectA(database = 'library') {
-  const response = await app.request('/api/sessions/A/connect', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify({ ...config.admin, database }) })
+  const response = await app.request('/api/sessions/A/connect', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify({ user: 'admin', password: '', database }) })
   expect(response.status).toBe(200)
 }
 async function query(sql: string): Promise<QueryResponse> {
@@ -96,6 +96,8 @@ describe('schema browser API (real PostgreSQL)', () => {
     })
     const admin = info.roles.find(role => role.name === 'dojo_admin')
     expect(admin).toMatchObject({ superuser: true, canLogin: true })
+    // Learner SQL runs as dojo_learner, so the browser lists it alongside the internal superuser.
+    expect(info.roles.find(role => role.name === 'dojo_learner')).toMatchObject({ superuser: false, canLogin: true })
     expect(info.roles.some(role => role.name.startsWith('pg_'))).toBe(false)
   })
   it('builds a mermaid ER diagram from the catalog', async () => {

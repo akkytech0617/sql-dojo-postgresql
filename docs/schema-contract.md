@@ -5,7 +5,7 @@
 
 ## DB・接続
 
-- 永続 DB は `library`、業務表はすべて `public`。所有者は管理者 `dojo_admin`。
+- 永続 DB は `library`、業務表はすべて `public`。所有者は学習用の作業用アカウント `dojo_learner`。
 - ch0 は `postgres`。ch1 の CREATE/DROP DATABASE は `postgres` で実行。
   `CREATE DATABASE library WITH ENCODING 'UTF8' LOCALE 'C' TEMPLATE template0;`
   DB 作成と他の文を同じバッチにしない（CREATE DATABASE はトランザクション不可）。
@@ -13,8 +13,10 @@
   search_path 実験後は `SET search_path TO public;`。業務 SQL は public を明記してもよい。
   DROP DATABASE は実験用 `library_scratch` だけを作成して削除、章末には残さない。
 - 通常 A/B は admin で library。`connect` は **必要な接続変更の明示**。
-  `user: 'admin'` はサーバー設定の管理者に置換し、password は空でよい。
+  `user: 'admin'` は非スーパーユーザーの作業用アカウント `dojo_learner` に置換し、password は空でよい。
   自動的なステップ切替では接続し直さない（開いたトランザクションを壊すため）。
+- 学習者 SQL・replay は `dojo_learner`、採点／リセット／スキーマ・権限・監視の固定 SQL は
+  スーパーユーザー `dojo_admin` の接続で実行する。学習者入力を後者の接続へ SQL として渡さない。
 - lesson.database（既定 library）は採点/再生の既定 DB。接続ユーザーの DB と必ず一致させる。
 - TCP 接続は公式 postgres:18 イメージの `host all all all scram-sha-256` に一致。
   ホストから誤パスワードが SQLSTATE 28P01 になることを確認済み。
@@ -129,21 +131,25 @@ BEGIN/COMMIT/ROLLBACK/SAVEPOINT、分離レベル、FOR UPDATE、競合貸出、
 |lib_sato|LOGIN, member of lib_reader|lib_sato_pw|
 |lib_yamada|LOGIN, member of lib_director|lib_yamada_pw|
 
-NO SUPERUSER/CREATEDB/CREATEROLE/BYPASSRLS、既定 INHERIT。
+NO SUPERUSER/CREATEDB/CREATEROLE/BYPASSRLS、既定 INHERIT。lib_ ロールに限る。
+作業用アカウント `dojo_learner` は起動時に冪等に作成/ALTERされ、非スーパーユーザーで
+CREATEDB/CREATEROLE と `pg_monitor`、`postgres.public` の USAGE/CREATE、`deadlock_timeout` の SET 権限を持つ（9章の実験用）。
+library が別所有者なら更新前の状態として警告する（自動変更しない）。
 lib_director: library CONNECT、公有schema USAGE、全業務表ALLとsequence USAGE/SELECT/UPDATE。
 lib_librarian: CONNECT/USAGE、全業務表SELECT/INSERT/UPDATE、sequence USAGE/SELECT（DELETEなし）。
 lib_reader: CONNECT/USAGE、categories/authors/books/book_authors/copies と v_book_catalog のSELECT。
 lib_app: CONNECT/USAGE、カタログ表SELECT、members SELECT(member_id,name), loans SELECT/INSERT/UPDATE、
 loans sequence USAGE/SELECT、return_loan EXECUTE。members email SELECT不可。
-DEFAULT PRIVILEGES は **FOR ROLE dojo_admin IN SCHEMA public**、lib_librarianへのSELECT/INSERT/UPDATE、
+DEFAULT PRIVILEGES は **FOR ROLE dojo_learner IN SCHEMA public**、lib_librarianへのSELECT/INSERT/UPDATE、
 lib_readerへのSELECT（将来表すべての公開が業務要件か検討を説明）、sequenceはlib_librarian USAGE/SELECT。
-PUBLICからlibrary CONNECTとpublic CREATEをREVOKE（adminは引き続き使用可）。
+PUBLICからlibrary CONNECTとpublic CREATEをREVOKE（所有者 dojo_learner は引き続き使用可）。
 関数の PUBLIC EXECUTE は REVOKEし必要なroleに明示GRANT。
 RLS実験はmembers、policy名 `members_self_policy`、
 lib_appに対して `member_id = NULLIF(current_setting('app.member_id',true),'')::integer`。
-ENABLE ROW LEVEL SECURITY、所有者adminは通常bypass。lib_appはSET app.member_id='1'後1行だけ読める。
+ENABLE ROW LEVEL SECURITY、所有者 dojo_learner は通常bypass（スーパーユーザー dojo_admin は常にbypass）。
+lib_appはSET app.member_id='1'後1行だけ読める。
 ユーザー任意設定が可能なため、このGUCは本番の認証代替でないと説明。
-章末RLS有効、policy維持、A/B管理者libraryに復帰。
+章末RLS有効、policy維持、A/B作業用アカウントlibraryに復帰。
 列権限とRLSは別層なのでlib_appにはemailを与えない。
 
 ### ch11
@@ -156,8 +162,8 @@ pg_dump/pg_restoreはローカル説明・manualステップ（APIからシェ�
 
 |章|永続状態|
 |---|---|
-|0|libraryなし、A/B admin@postgres|
-|1|library UTF8/C、publicと空stagingのみ。A/B admin@library|
+|0|libraryなし、A/B dojo_learner@postgres|
+|1|library UTF8/C、publicと空stagingのみ。A/B dojo_learner@library|
 |2|schema.sqlと一致、7表すべて0行、books COMMENT、open-copy UNIQUE|
 |3|seed.sqlの全行・sequence。CSV実験行もcanonicalに含む|
 |4|ch3と同じ（検索だけ）|
@@ -165,8 +171,8 @@ pg_dump/pg_restoreはローカル説明・manualステップ（APIからシェ�
 |6|ch3と同じ（変更実験はROLLBACK/復元、deleted_atはNULL）|
 |7|ch3＋上記view/MV/function/trigger/procedure、業務行不変|
 |8|ch7＋loan_history100万行と上記4索引|
-|9|ch8不変、A/B idle、admin@library|
-|10|ch9＋上記7role、権限/DEFAULT PRIVILEGES/RLS、A/B idle admin@library|
+|9|ch8不変、A/B idle、dojo_learner@library|
+|10|ch9＋上記7role、権限/DEFAULT PRIVILEGES/RLS、A/B idle dojo_learner@library|
 |11|ch10不変、dump/restoreは説明だけ、残存実験DBなし|
 |12|ch11＋reservationsと2索引/権限、0行、A/B idle|
 
@@ -177,18 +183,19 @@ idは `chNN-MM`（NNは章2桁、MMは01から連番）。chapter idは0..12。
 story/explanation/task/mysqlNoteはMarkdown。全stepにMySQL差分を付ける。
 hintsは短い段階的ヒント、solutionは指定session向けSQL。
 
-- check sql: 管理者・別接続・BEGIN/ROLLBACK内で実行し、最初の行の最初の値がtrueなら合格。
+- check sql: 採点用スーパーユーザー dojo_admin の別接続・BEGIN READ ONLY内で実行し、最初の行の最初の値がtrueなら合格。
   不存在objectの採点SQLエラーは不合格。solution前は必ず不合格になる検査を書き、
   説明/既存状態確認だけならmanual/result-equalsを使う。例外checkPassesBeforeは理由付きで限定。
-- result-equals: 管理者BEGIN/ROLLBACKでexpectedSqlを評価、利用者の**最後の結果**と列名/値を比較。
+- result-equals: 採点用スーパーユーザー dojo_admin のBEGIN READ ONLYでexpectedSqlを評価、利用者の**最後の結果**と列名/値を比較。
   ordered既定false、trueなら行順も一致。expectedは必ず非空（空の誤答を拒否するテスト）。
   dateはAPIと同じISO形式。truncated結果は採点不可。LIMITを付ける。
+  実行主体で変わる current_user / usename は採点対象の列に含めない（学習者は dojo_learner、採点は dojo_admin）。
 - error-code: 最後のSQLSTATE一致。失敗による永続変更はないこと。
 - script: A/B guided actionsを順番通り実行。blocksは500ms（UIでは1000ms）経過しても未完了。
   後続actionで必ず解除し、ブロックした問い合わせの最終結果も成功（または明示completionErrorCode）とする。
   実行中のsessionに次query/connectを送らない。初めにconnect指定できる。
 - manual: 説明を読んで採点/次へ、SQLなし。
-- replay: 管理者が各stepを新しい接続で再現するSQL、既定solution。
+- replay: 作業用アカウント dojo_learner が各stepを新しい接続で再現するSQL、既定solution。
   AB/errorは必須。結果だけ/読解はreplay:''推奨。
   SETや開いたtransactionは再生接続間で引き継がない。
   replayDatabase > database > library の順。CREATE DATABASEはpostgres。
@@ -205,7 +212,7 @@ POST /api/lessons/check: {stepId,lastResult?,lastError?,scriptCompleted?} → {p
 scriptCompletedはローカル追跡のboolean[]。このローカル教材は不正防止試験基盤ではない。
 POST /api/reset: {toChapter?:number} → {toChapter,replayedSteps,message}。
 chapter<cだけを再生。0は全リセット、c=13は全章再生。SQLSTATEエラーはHTTP400。
-resetは全manager接続をcancel/disconnectしてA/B/adminをpostgresへ戻し、
-libraryの外部backendをterminate、DROP DATABASE library / library_scratch（WITH FORCE）、各DBのlib_所有物を管理者へREASSIGNし
-DROP OWNED、lib_ roleをDROP。その後教材を再生、libraryがあればA/Bを管理者libraryへ。
+resetは全manager接続をcancel/disconnectしてA/B/adminをdojo_learner@postgresへ戻し、
+libraryの外部backendをterminate、DROP DATABASE library / library_scratch（WITH FORCE）、各DBのlib_所有物を作業用アカウント dojo_learner へREASSIGNし
+DROP OWNED、lib_ roleをDROP（維持系はスーパーユーザー dojo_admin、再生は dojo_learner）。その後教材を再生、libraryがあればA/Bをdojo_learner@libraryへ。
 ローカル専用。`lib_` roleやlibraryに実データを置かない。他名のDBは削除しない。

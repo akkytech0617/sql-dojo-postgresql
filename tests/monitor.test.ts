@@ -29,8 +29,8 @@ afterAll(async () => { await manager.close() })
 describe('lock monitor API', () => {
   it('reports the blocked/blocking pair while a row lock is held, then clears it after release', async () => {
     // Sessions stay on the always-present postgres database so this test is independent of lesson state.
-    expect((await post('/sessions/A/connect', config.admin)).status).toBe(200)
-    expect((await post('/sessions/B/connect', config.admin)).status).toBe(200)
+    expect((await post('/sessions/A/connect', config.learner)).status).toBe(200)
+    expect((await post('/sessions/B/connect', config.learner)).status).toBe(200)
     await query('A', `CREATE TABLE IF NOT EXISTS public.monitor_demo (id integer PRIMARY KEY, note text NOT NULL);
 INSERT INTO public.monitor_demo (id, note) VALUES (1, 'x') ON CONFLICT (id) DO NOTHING;`)
 

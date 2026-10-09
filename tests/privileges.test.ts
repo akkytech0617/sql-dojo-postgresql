@@ -33,10 +33,12 @@ describe('privileges viewer API (ch10 end state)', () => {
   it('reports roles, login attributes and memberships', async () => {
     const data = await fetchPrivileges()
     const names = data.roles.map(role => role.name)
-    expect(names).toEqual(['dojo_admin', 'lib_app', 'lib_director', 'lib_librarian', 'lib_reader', 'lib_sato', 'lib_tanaka', 'lib_yamada'])
+    expect(names).toEqual(['dojo_admin', 'dojo_learner', 'lib_app', 'lib_director', 'lib_librarian', 'lib_reader', 'lib_sato', 'lib_tanaka', 'lib_yamada'])
     const byName = Object.fromEntries(data.roles.map(role => [role.name, role]))
     expect(data.roles.filter(role => role.name.startsWith('lib_')).every(role => !role.superuser)).toBe(true)
     expect(byName.dojo_admin.superuser).toBe(true)
+    // The learner's working account may create databases/roles for the lessons, but is not a superuser.
+    expect(byName.dojo_learner).toMatchObject({ superuser: false, canLogin: true, memberOf: ['pg_monitor'] })
     expect(byName.lib_director).toMatchObject({ canLogin: false, memberOf: [], members: ['lib_yamada'] })
     expect(byName.lib_librarian).toMatchObject({ canLogin: false, memberOf: [], members: ['lib_tanaka'] })
     expect(byName.lib_reader).toMatchObject({ canLogin: false, memberOf: [], members: ['lib_sato'] })
@@ -92,8 +94,8 @@ describe('privileges viewer API (ch10 end state)', () => {
     expect(mode('copies', 'lib_app', 'SELECT')).toBe('direct')
     expect(mode('members', 'lib_app', 'SELECT')).toBe('none')
     // The owner holds everything directly; views and sequences are out of the table matrix.
-    expect(mode('members', 'dojo_admin', 'SELECT')).toBe('direct')
-    expect(mode('members', 'dojo_admin', 'TRIGGER')).toBe('direct')
+    expect(mode('members', 'dojo_learner', 'SELECT')).toBe('direct')
+    expect(mode('members', 'dojo_learner', 'TRIGGER')).toBe('direct')
     expect(data.tables.map(table => table.table)).not.toContain('v_book_catalog')
     expect(data.tables.map(table => table.table)).toContain('loan_history')
   })
@@ -123,17 +125,17 @@ describe('privileges viewer API (ch10 end state)', () => {
     expect(execute('return_loan', 'lib_tanaka')).toBe('none')
     expect(execute('calc_late_fee', 'public')).toBe('none')
     expect(execute('check_loan_available', 'public')).toBe('none')
-    expect(execute('calc_late_fee', 'dojo_admin')).toBe('direct')
+    expect(execute('calc_late_fee', 'dojo_learner')).toBe('direct')
   })
 
-  it('reports default privileges for dojo_admin in schema public', async () => {
+  it('reports default privileges for dojo_learner in schema public', async () => {
     const data = await fetchPrivileges()
-    const tables = data.defaultPrivileges.find(item => item.ownerRole === 'dojo_admin' && item.schema === 'public' && item.objectType === 'TABLES')
+    const tables = data.defaultPrivileges.find(item => item.ownerRole === 'dojo_learner' && item.schema === 'public' && item.objectType === 'TABLES')
     expect(tables?.grants).toEqual([
       { grantee: 'lib_librarian', privileges: ['INSERT', 'SELECT', 'UPDATE'] },
       { grantee: 'lib_reader', privileges: ['SELECT'] },
     ])
-    const sequences = data.defaultPrivileges.find(item => item.ownerRole === 'dojo_admin' && item.schema === 'public' && item.objectType === 'SEQUENCES')
+    const sequences = data.defaultPrivileges.find(item => item.ownerRole === 'dojo_learner' && item.schema === 'public' && item.objectType === 'SEQUENCES')
     expect(sequences?.grants).toEqual([{ grantee: 'lib_librarian', privileges: ['SELECT', 'USAGE'] }])
   })
 

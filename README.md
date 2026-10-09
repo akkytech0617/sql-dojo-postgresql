@@ -29,7 +29,11 @@ pnpm dev                      # API（127.0.0.1:3001）+ Vite（127.0.0.1:5173�
 | アプリ | http://127.0.0.1:5173 |
 | API | http://127.0.0.1:3001（Vite が `/api` をプロキシー） |
 | PostgreSQL | 127.0.0.1:5433 / データベース `postgres` |
-| 開発用の管理者 | `dojo_admin` / `dojo_admin_pw`（`.env` で変更可） |
+| 学習用の作業アカウント | `dojo_learner` / `dojo_learner_pw`（パスワードは `.env` の `DOJO_LEARNER_PASSWORD` で変更可） |
+| アプリ内部の管理者（スーパーユーザー） | `dojo_admin` / `dojo_admin_pw`（`.env` で変更可。アプリのリセット・採点と、11章のバックアップ演習（ターミナルで実行）だけに使います） |
+
+- 学習者の SQL はすべて非スーパーユーザーの `dojo_learner` として実行されます。`dojo_learner` はロールを作成・データベースを作成できますが、スーパーユーザーではありません（`COPY ... TO PROGRAM` などは PostgreSQL が拒否します）。`dojo_admin` はアプリがリセット・採点のために内部で使うほか、11章のバックアップ演習でターミナルから使います。画面のセッションはスーパーユーザーでの接続を拒否します。ロールは起動時に自動作成されるので、手動のセットアップは不要です。
+- セッションの「接続設定」でユーザー名に `admin` を指定すると、サーバー側で `dojo_learner` に置き換わります（パスワードは空で構いません）。教材の接続指定もこのショートカットを使っています。`dojo_learner` のロール名は教材が前提にしているため固定で、変更できません。
 
 - `docker compose up -d --wait` は DB の起動完了まで待ちます。`pnpm db:up` / `pnpm db:down` は同じ compose の起動・停止です。
 - セッション A・B・admin は初回の SQL 実行時に接続します。接続先は画面から切り替えられます。
@@ -100,7 +104,8 @@ docker compose ps
 docker compose logs db
 ```
 
-- **DB に接続できない**: `docker compose up -d --wait` で起動し、画面のセッションバーから接続し直します。`dojo_admin_pw` を変えた場合は `.env` と画面の接続先をそろえてください。
+- **DB に接続できない**: `docker compose up -d --wait` で起動し、画面のセッションバーから接続し直します。`dojo_admin_pw` を変えた場合は `.env` の `POSTGRES_PASSWORD` を DB の作成時の値とそろえ、学習用アカウントのパスワードを変えた場合は `.env` の `DOJO_LEARNER_PASSWORD` に合わせてください。
+- **更新後に教材が途中で通らない**: 更新前に作られた `library` は `dojo_admin` の所有のままです。起動時にその旨のメッセージが出たら、「章の最初からやり直す」（または「全部リセット」）を一度実行してください。以降は `dojo_learner` の所有で作り直されます。
 - **教材が途中で通らない**: 「章の最初からやり直す」→ 直らなければ「全部リセット」。リセットは ch8 で100万行を作るため、数十秒かかることがあります。
 - **DB を作り直したい**: `docker compose down -v`（ボリュームごと削除）→ `docker compose up -d --wait`。
 - **リセット中の操作**: 再生中は API が 409 を返します。少し待ってから操作してください。
@@ -140,8 +145,8 @@ PGPORT=5437 docker compose -p sql-dojo-gate down -v
 - 外部に公開しません。API・DB・Vite はすべてループバック（127.0.0.1）に限定しています。
 - API は `Host` が `127.0.0.1` / `localhost` の 5173 / 3001 以外なら 403（DNS リバインディング対策）、Origin も同様に検証し、POST は `application/json` のみ受け付けます。`Sec-Fetch-Site` が `same-origin` / `none` 以外のリクエスト（他サイトの `<img>` など）も 403 です。
 - 画面と API は `X-Frame-Options: DENY` と CSP の `frame-ancestors 'none'` を返し、他サイトの iframe に埋め込めません（クリックジャッキング対策）。
-- 認証はありません。**管理者権限で任意の SQL（`DROP DATABASE` を含む）を実行できます。** 実データや本番の認証情報は接続しないでください。
-- 学習用セッションは PostgreSQL のスーパーユーザーで接続するため、`COPY ... TO PROGRAM` で **DB コンテナー内のシェルコマンドも実行できます**（PostgreSQL の仕様）。影響をコンテナー内に閉じ込めるため、`docker-compose.yml` で `no-new-privileges`・最小限のケーパビリティー・プロセス数の上限を設定しています。コンテナーにホストのディレクトリーをマウントしないでください。
+- 認証はありません。学習用の作業アカウント `dojo_learner` で任意の SQL（`CREATE DATABASE` / `DROP DATABASE` を含む）を実行できますが、**スーパーユーザーではありません**。サーバー上のファイルの読み書き（`COPY ... TO PROGRAM`、`COPY ... TO '/path'`、`pg_read_file`）や任意ロールの乗っ取りは PostgreSQL が 42501 で拒否します。実データや本番の認証情報は接続しないでください。
+- 学習者の SQL は非スーパーユーザー `dojo_learner` で実行される一方、アプリはリセット・採点のためにスーパーユーザー `dojo_admin` の接続も内部で持ちます（学習者の入力がこの接続に SQL として届くことはなく、画面のセッションをスーパーユーザーで開くこともできません）。念のため `docker-compose.yml` のコンテナー権限（`no-new-privileges`・最小限のケーパビリティー・プロセス数の上限）は多層防御として残しています。コンテナーにホストのディレクトリーをマウントしないでください。
 - 1つの SQL は 5 分で打ち切られます（`statement_timeout`。`SET` で変更できますが、`RESET ALL` で 5 分に戻ります）。1回の実行で返す通知は 1,000 件までです。
 - DB の開発用パスワードは `.env`（リポジトリーには含めません。`.env.example` をコピーして使います）にあります。教材の `lib_*` ロールのパスワード（`lib_app_pw` など）は練習専用です。採点はローカル DB のカタログを見るだけの仕組みで、不正防止の試験基盤ではありません。
 

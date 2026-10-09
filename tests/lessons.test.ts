@@ -173,15 +173,20 @@ describe('lesson engine fixture and regression checks', () => {
     expect(counts.results[0].rows[0]).toEqual({ categories: 10, authors: 30, books: 50, book_authors: 55, copies: 80, members: 20, loans: 100, overdue: 10 })
     const user = 'lib_engine_test'
     expect((await h.query('A', `CREATE ROLE ${user} LOGIN PASSWORD 'lib_engine_test_pw'; GRANT CONNECT ON DATABASE library TO ${user};`)).error).toBeUndefined()
-    expect((await h.query('admin', `CREATE TABLE public.lib_engine_owned(value integer); ALTER TABLE public.lib_engine_owned OWNER TO ${user}`)).error).toBeUndefined()
+    // A lesson role cannot SET ROLE to a role it created, so the superuser seeds a lib_-owned object.
+    await withAdmin('postgres', async client => {
+      await client.query('CREATE TABLE public.lib_engine_owned(value integer)')
+      await client.query(`ALTER TABLE public.lib_engine_owned OWNER TO ${user}`)
+    })
     const bad = await h.app.request('/api/sessions/B/connect', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: `127.0.0.1:${config.apiPort}` }, body: JSON.stringify({ user, password: 'wrong', database: 'library' }) })
     expect(((await bad.json()) as { error: { code: string } }).error.code).toBe('28P01')
     await h.post('/sessions/B/connect', { user, password: 'lib_engine_test_pw', database: 'library' })
     expect((await h.query('B', 'SELECT current_user')).results[0].rows[0]).toEqual({ current_user: user })
     await h.reset(0)
     expect(await withAdmin('postgres', async client => (await client.query("SELECT count(*)::int AS count FROM pg_roles WHERE starts_with(rolname,'lib_')")).rows[0].count)).toBe(0)
-    // Ownership in postgres is preserved under admin, not destructively dropped.
+    // Ownership in postgres moves to the learner account, so surviving objects stay usable.
     expect((await h.query('admin', 'SELECT * FROM public.lib_engine_owned')).error).toBeUndefined()
+    expect(await withAdmin('postgres', async client => (await client.query<{ owner: string }>("SELECT pg_get_userbyid(relowner) AS owner FROM pg_class WHERE relname = 'lib_engine_owned'")).rows[0].owner)).toBe(config.learner.user)
     await h.query('admin', 'DROP TABLE public.lib_engine_owned')
   })
   it('rejects malformed input and unsafe asset paths', async () => {

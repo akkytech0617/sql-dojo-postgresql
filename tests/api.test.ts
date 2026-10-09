@@ -104,14 +104,14 @@ describe('PostgreSQL API (real database)', () => {
     for (let i = 0; i < 100 && !manager.status('A').busy; i++) await new Promise(resolve => setTimeout(resolve, 10))
     await new Promise(resolve => setTimeout(resolve, 100))
     expect(manager.status('A').busy).toBe(true)
-    expect((await post('/sessions/A/connect', config.admin)).status).toBe(400)
+    expect((await post('/sessions/A/connect', config.learner)).status).toBe(400)
     const response = await post('/sessions/A/cancel')
     expect(await response.json()).toEqual({ cancelled: true })
     expect((await running).error?.code).toBe('57014')
     expect(manager.status('A').busy).toBe(false)
   })
   it('serves only the fixed lesson sessions and rejects unknown ids with 404', async () => {
-    expect((await post('/sessions/custom/connect', config.admin)).status).toBe(404)
+    expect((await post('/sessions/custom/connect', config.learner)).status).toBe(404)
     expect((await post('/sessions/E/query', { sql: 'SELECT 1' })).status).toBe(404)
     expect((await app.request('/api/sessions/zzz/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: '{}' })).status).toBe(404)
     expect(manager.list().map(session => session.id)).toEqual(['admin', 'A', 'B'])
@@ -126,7 +126,7 @@ describe('PostgreSQL API (real database)', () => {
     for (let i = 0; i < 100 && manager.status('B').connected; i++) await new Promise(resolve => setTimeout(resolve, 10))
     expect(manager.status('B').connected).toBe(false)
     expect((await query('SELECT 1', 'B')).error?.code).toBe('08003')
-    expect((await post('/sessions/B/connect', config.admin)).status).toBe(200)
+    expect((await post('/sessions/B/connect', config.learner)).status).toBe(200)
   })
   it('validates SQL, session IDs, JSON and browser origins', async () => {
     expect((await post('/sessions/A/query', { sql: ' ' })).status).toBe(400)
@@ -134,5 +134,18 @@ describe('PostgreSQL API (real database)', () => {
     expect((await post('/sessions/bad!/query', { sql: 'SELECT 1' })).status).toBe(400)
     expect((await app.request('/api/sessions/A/cancel', { method: 'POST', headers: { Host: host } })).status).toBe(415)
     expect((await app.request('/api/sessions/A/cancel', { method: 'POST', headers: { Origin: 'https://example.com', 'Content-Type': 'application/json', Host: host }, body: '{}' })).status).toBe(403)
+  })
+  it('runs learner SQL as the non-superuser dojo_learner account', async () => {
+    const result = await query('SELECT current_user AS account, (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS rolsuper')
+    expect(result.results[0].rows).toEqual([{ account: config.learner.user, rolsuper: false }])
+  })
+  it('rejects superuser-only operations with 42501', async () => {
+    const cases = [
+      "COPY (SELECT 1) TO PROGRAM 'id'",
+      "COPY (SELECT 1) TO '/tmp/sql-dojo-learner-write.txt'",
+      `ALTER ROLE ${config.learner.user} SUPERUSER`,
+      `GRANT pg_execute_server_program TO ${config.learner.user}`,
+    ]
+    for (const sql of cases) expect((await query(sql)).error?.code, sql).toBe('42501')
   })
 })

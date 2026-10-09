@@ -19,6 +19,7 @@
 Chapterをdefault export、stepsに共通型Stepを追加。全て日本語、mysqlNoteも各stepに付ける。
 通常 `database:'library', session:'A'`、接続変更は
 `connect:{A:{user:'admin',password:'',database:'library'}}`。
+`'admin'` は非スーパーユーザーの作業用アカウント dojo_learner に対応する（サーバー側で置換）。
 初回ステップは必要な接続を明示。ABは両方明示。
 トランザクションの続きのstepにconnect指定しない。
 
@@ -56,6 +57,6 @@ ch0–12はすべて執筆済みなので、範囲開始前の状態は実章の
 test:lessonsは教材を実行し、終了時DBは最後のテストの状態（全リセットされる場合もある）。
 pnpm testは全テスト、ファイル並列なし。ローカルDBは破壊的にリセットされる。
 
-通常テストは管理者solution、connectでlesson roleにも実際にTCP接続。
+通常テストは dojo_learner（`'admin'` ショートカット）でsolutionを実行、connectでlesson roleにも実際にTCP接続。
 seedの値を変えない。lib_以外のroleは作らない。実験DBは同stepで削除。
 コミットはオーケストレーター担当です。

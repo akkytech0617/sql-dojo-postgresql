@@ -33,7 +33,7 @@ describe('explain panel request building', () => {
 
 describe('explain-wrap rollback against the real API', () => {
   it('a failed wrapped batch aborts the transaction and the cleanup ROLLBACK restores idle', async () => {
-    expect((await app.request('/api/sessions/A/connect', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify({ ...config.admin, database: 'postgres' }) })).status).toBe(200)
+    expect((await app.request('/api/sessions/A/connect', { method: 'POST', headers: { 'Content-Type': 'application/json', Host: host }, body: JSON.stringify(config.learner) })).status).toBe(200)
     // Exactly what the explain panel sends for a modifying statement under ANALYZE.
     const wrapped = explainRequest('UPDATE public.no_such_explain_table SET x = 1', 'FORMAT JSON, ANALYZE', true)
     const result = await query(wrapped)

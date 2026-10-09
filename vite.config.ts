@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 const webPort = Number(process.env.WEB_PORT ?? 5173)
 const apiPort = Number(process.env.API_PORT ?? 3001)
-// The app drives a superuser PostgreSQL session, so no other site may frame it (clickjacking).
+// The API keeps a PostgreSQL superuser session for maintenance (reset/grading), so no other site may frame it (clickjacking).
 const securityHeaders = {
   'X-Frame-Options': 'DENY',
   'Content-Security-Policy': "frame-ancestors 'none'",

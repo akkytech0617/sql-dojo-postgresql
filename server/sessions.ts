@@ -1,6 +1,7 @@
 import { Client, type QueryResult as PgResult } from 'pg'
 import type { EventEmitter } from 'node:events'
 import { config } from './config.js'
+import { ensureLearnerRole } from './learner.js'
 import { serializeSqlError } from './errors-ja.js'
 import type { ConnectionInfo, QueryResponse, SessionStatus, SqlNotice, TransactionStatus } from '../src/shared/types.js'
 
@@ -46,6 +47,8 @@ export class SessionManager {
       application_name: 'sql-dojo', statement_timeout: STATEMENT_TIMEOUT_MS })
   }
   private async open(session: Session, info: ConnectionInfo) {
+    // Every learner path goes through here; the bootstrap is idempotent and memoized per process.
+    await ensureLearnerRole()
     const old = session.client
     this.clear(session)
     session.lazy = false
@@ -56,6 +59,12 @@ export class SessionManager {
     client.on('end', () => { if (session.client === client) this.clear(session) })
     try {
       await client.connect()
+      // Learner SQL must never run as a superuser (COPY ... TO PROGRAM reaches the container shell),
+      // even when someone types the maintenance account into the connect form.
+      const role = await client.query<{ superuser: boolean }>('SELECT rolsuper AS superuser FROM pg_roles WHERE rolname = current_user')
+      if (role.rows[0]?.superuser !== false) {
+        throw sessionError('42501', 'スーパーユーザーでは接続できません。学習用の作業アカウント（ユーザー名 admin）か、教材で作ったロールで接続してください。')
+      }
       session.client = client
       // pg does not expose ReadyForQuery in its public typings; this event carries I/T/E.
       const connection = protocolConnection(client)
@@ -110,7 +119,7 @@ export class SessionManager {
     let client: Client | null = null
     const started = performance.now()
     try {
-      if (!session.client && session.lazy) await this.open(session, config.admin)
+      if (!session.client && session.lazy) await this.open(session, config.learner)
       client = session.client
       if (!client) throw sessionError('08003', 'セッションは未接続です。接続し直してください。')
       client.on('notice', noticeListener)

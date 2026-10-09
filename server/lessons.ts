@@ -3,11 +3,19 @@ import { chapters as defaultChapters } from '../lessons/index.js'
 import type { Chapter, CheckRequest, CheckResponse, ResetResponse, Step } from '../src/shared/lessons.js'
 import type { SessionManager } from './sessions.js'
 import { config } from './config.js'
+import { ensureLearnerRole } from './learner.js'
 import { expandLessonSql, splitStatements } from './lesson-sql.js'
 const identifier = (name: string) => `"${name.replaceAll('"', '""')}"`
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 export async function withAdmin<T>(database: string, run: (client: Client) => Promise<T>): Promise<T> {
   const client = new Client({ host: config.host, port: config.port, ...config.admin, database, connectionTimeoutMillis: 5000, application_name: 'sql-dojo-check' })
+  client.on('error', () => undefined)
+  try { await client.connect(); return await run(client) } finally { await client.end().catch(() => undefined) }
+}
+/** Learner-controlled SQL (replay, free practice) runs as the non-superuser learner account. */
+export async function withLearner<T>(database: string, run: (client: Client) => Promise<T>): Promise<T> {
+  await ensureLearnerRole()
+  const client = new Client({ host: config.host, port: config.port, ...config.learner, database, connectionTimeoutMillis: 5000, application_name: 'sql-dojo-check' })
   client.on('error', () => undefined)
   try { await client.connect(); return await run(client) } finally { await client.end().catch(() => undefined) }
 }
@@ -74,26 +82,28 @@ export class LessonEngine {
           const databases = (await client.query<{ datname: string }>('SELECT datname FROM pg_database WHERE datallowconn ORDER BY datname')).rows
           for (const { datname } of databases) await withAdmin(datname, async db => {
             for (const { rolname } of roles) {
-              await db.query(`REASSIGN OWNED BY ${identifier(rolname)} TO ${identifier(config.admin.user)}`)
+              // Objects left by a lesson role stay usable: they move to the learner account that owns the dojo.
+              await db.query(`REASSIGN OWNED BY ${identifier(rolname)} TO ${identifier(config.learner.user)}`)
               await db.query(`DROP OWNED BY ${identifier(rolname)}`)
             }
           })
           for (const { rolname } of roles) await client.query(`DROP ROLE ${identifier(rolname)}`)
         }
       })
-      for (const id of ['admin', 'A', 'B']) await this.manager.connect(id, config.admin)
+      for (const id of ['admin', 'A', 'B']) await this.manager.connect(id, config.learner)
       for (const chapter of this.chapters.filter(chapter => chapter.id < toChapter).sort((a, b) => a.id - b.id)) {
         for (const step of chapter.steps) {
           if ((step.session === 'AB' || step.check.type === 'error-code') && step.replay === undefined) throw new Error(`${step.id}: AB/エラーステップには replay が必要です。`)
           const sql = await expandLessonSql(step.replay ?? step.solution)
-          if (sql.trim()) await withAdmin(step.replayDatabase ?? step.database ?? 'library', async client => {
+          // Replay as the learner so replayed objects are learner-owned, exactly like the solutions.
+          if (sql.trim()) await withLearner(step.replayDatabase ?? step.database ?? 'library', async client => {
             for (const statement of splitStatements(sql)) await client.query(statement)
           })
           replayedSteps.push(step.id)
         }
       }
       const exists = await withAdmin('postgres', async client => (await client.query("SELECT 1 FROM pg_database WHERE datname='library'")).rowCount !== 0)
-      if (exists) for (const id of ['A', 'B']) await this.manager.connect(id, { ...config.admin, database: 'library' })
+      if (exists) for (const id of ['A', 'B']) await this.manager.connect(id, { ...config.learner, database: 'library' })
       return { toChapter, replayedSteps, message: `${toChapter} 章の開始状態に戻しました。` }
     } finally { this.resetting = false }
   }

@@ -18,10 +18,11 @@ import {
 /** All non-system roles plus the pseudo role PUBLIC (grantee oid 0 in ACLs). */
 const rolesUnion = "(SELECT rolname::text AS rolname FROM pg_roles WHERE NOT starts_with(rolname, 'pg_') UNION SELECT 'public')"
 
+/** A CREATEROLE creator gets an admin-option-only row on each role it makes; it grants no privileges, so it is not shown as membership. */
 const rolesSql = `
   SELECT r.rolname::text AS name, r.rolcanlogin AS "canLogin", r.rolsuper AS superuser, r.rolinherit AS inherit,
-    COALESCE((SELECT array_agg(g.rolname::text ORDER BY g.rolname) FROM pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid WHERE m.member = r.oid), '{}'::text[]) AS "memberOf",
-    COALESCE((SELECT array_agg(g.rolname::text ORDER BY g.rolname) FROM pg_auth_members m JOIN pg_roles g ON g.oid = m.member WHERE m.roleid = r.oid), '{}'::text[]) AS members
+    COALESCE((SELECT array_agg(g.rolname::text ORDER BY g.rolname) FROM pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid WHERE m.member = r.oid AND (m.inherit_option OR m.set_option)), '{}'::text[]) AS "memberOf",
+    COALESCE((SELECT array_agg(g.rolname::text ORDER BY g.rolname) FROM pg_auth_members m JOIN pg_roles g ON g.oid = m.member WHERE m.roleid = r.oid AND (m.inherit_option OR m.set_option)), '{}'::text[]) AS members
   FROM pg_roles r WHERE NOT starts_with(r.rolname, 'pg_') ORDER BY r.rolname`
 
 const databaseSql = `

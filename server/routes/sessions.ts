@@ -20,7 +20,8 @@ export function sessionRoutes(manager: SessionManager) {
   routes.post('/:id/connect', async c => {
     const parsed = connectionSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return c.json({ message: 'ユーザー名・パスワード・データベース名を確認してください。' }, 400)
-    const info = parsed.data.user === 'admin' ? { ...config.admin, database: parsed.data.database } : parsed.data
+    // The 'admin' shortcut names the learner's working account; it is not the dojo_admin superuser.
+    const info = parsed.data.user === 'admin' ? { ...config.learner, database: parsed.data.database } : parsed.data
     return c.json(await manager.connect(c.req.param('id'), info))
   })
   routes.post('/:id/disconnect', async c => c.json(await manager.disconnect(c.req.param('id'))))

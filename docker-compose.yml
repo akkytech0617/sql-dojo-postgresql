@@ -9,8 +9,9 @@ services:
       POSTGRES_DB: postgres
     ports:
       - "127.0.0.1:${PGPORT:-5433}:5432"
-    # Learner SQL runs as a superuser, which can run shell commands inside this container
-    # (COPY ... TO PROGRAM). Keep the container's own privileges as small as postgres allows.
+    # Learner SQL runs as the non-superuser dojo_learner role, so COPY ... TO PROGRAM is rejected
+    # by PostgreSQL. The superuser dojo_admin still exists for the app's reset/grading maintenance;
+    # keep the container's own privileges as small as postgres allows as defense in depth.
     security_opt:
       - no-new-privileges:true
     cap_drop:
